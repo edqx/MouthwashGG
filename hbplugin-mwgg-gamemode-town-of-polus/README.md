@@ -1,0 +1,1 @@
+# hbplugin-mwgg-gamemode-vanilla

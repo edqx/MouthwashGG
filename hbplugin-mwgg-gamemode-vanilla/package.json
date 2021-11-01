@@ -1,0 +1,17 @@
+{
+    "name": "hbplugin-mwgg-gamemode-vanilla",
+    "license": "SSPL-1.0",
+    "packageManager": "yarn@3.0.0-rc.13",
+    "main": "./dist/index.js",
+    "scripts": {
+        "build": "tsc -p ./"
+    },
+    "devDependencies": {
+        "@skeldjs/hindenburg": "link:../../Hindenburg",
+        "typescript": "^4.4.4"
+    },
+    "dependencies": {
+        "hbplugin-mouthwashgg-api": "link:../hbplugin-mouthwashgg-api",
+        "mouthwash-types": "link:../mouthwash-types"
+    }
+}

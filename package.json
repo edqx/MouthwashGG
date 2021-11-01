@@ -1,0 +1,8 @@
+{
+  "name": "mouthwash-gg",
+  "version": "1.0.0",
+  "license": "SSPL-1.0",
+  "main": "index.js",
+  "author": "Edward Smale <essmale2005@gmail.com>",
+  "packageManager": "yarn@3.0.0-rc.13"
+}

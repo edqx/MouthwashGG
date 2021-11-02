@@ -1,3 +1,4 @@
+import { EventEmitter, ExtractEventTypes } from "@skeldjs/events";
 import {
     ComponentSpawnData,
     HazelWriter,
@@ -17,6 +18,7 @@ import {
     RGBA
 } from "mouthwash-types";
 
+import { ButtonClickEvent } from "../../events";
 import { MouthwashApiPlugin } from "../../plugin";
 
 import { Asset } from "../assets";
@@ -35,24 +37,85 @@ export interface ButtonSpawnInfo {
     keys: KeyCode[];
 }
 
-export class Button {
+export type ButtonEvents = ExtractEventTypes<[ ButtonClickEvent ]>;
+
+export class Button extends EventEmitter<ButtonEvents> {
+    graphic: Graphic;
+    clickBehaviour: ClickBehaviour;
+
     constructor(
         public readonly id: string,
+        public readonly player: PlayerData,
         public readonly customNetworkTransform: CustomNetworkTransformGeneric
-    ) {}
+    ) {
+        super();
 
-    get graphic() {
-        return this.customNetworkTransform.components[1] as Graphic;
+        this.graphic = customNetworkTransform.components[1] as Graphic;
+        this.clickBehaviour = customNetworkTransform.components[2] as ClickBehaviour;
+
+        this.clickBehaviour.on("mwgg.clickbehaviour.click", async () => {
+            const ev = await this.emit(new ButtonClickEvent(this));
+
+            if (!ev.canceled) {
+                this.setCurrentTime(this.maxTimer);
+                this.setCountingDown(true);
+                this.setSaturated(false);
+            }
+        });
     }
 
-    get clickBehaviour() {
-        return this.customNetworkTransform.components[2] as ClickBehaviour;
+    get maxTimer() {
+        return this.clickBehaviour.maxTimer;
+    }
+
+    get currentTime() {
+        return this.clickBehaviour.currentTime;
+    }
+
+    get saturated() {
+        return this.clickBehaviour.saturated;
+    }
+
+    get color() {
+        return this.clickBehaviour.color;
+    }
+
+    get countingDown() {
+        return this.clickBehaviour.countingDown;
+    }
+
+    get keys() {
+        return this.clickBehaviour.keys;
     }
 
     destroy() {
         for (let i = 0; i < this.customNetworkTransform.components.length; i++) {
             this.customNetworkTransform.components[i].despawn();
         }
+    }
+
+    setColor(color: RGBA) {
+        this.clickBehaviour.setColor(color);
+    }
+
+    setSaturated(saturated: boolean) {
+        this.clickBehaviour.setSaturated(saturated);
+    }
+
+    setCountingDown(countingDown: boolean) {
+        this.clickBehaviour.setCountingDown(countingDown);
+    }
+
+    setCurrentTime(time: number) {
+        this.clickBehaviour.setCurrentTime(time);
+    }
+
+    setMaxTimer(maxTimer: number) {
+        this.clickBehaviour.setMaxTimer(maxTimer);
+    }
+
+    async click() {
+        await this.clickBehaviour.click();
     }
 }
 
@@ -160,7 +223,7 @@ export class ButtonService {
             ], undefined, [ connection ]);
         }
 
-        const button = new Button(buttonId, spawnedObject);
+        const button = new Button(buttonId, player, spawnedObject);
         buttons.set(buttonId, button);
 
         return button;

@@ -6,20 +6,27 @@ import {
     Worker,
     RegisterMessage,
     MessageHandler,
-    PacketContext
+    PacketContext,
+    RegisterPrefab,
+    Networkable
 } from "@skeldjs/hindenburg";
 
 import {
     BeginCameraAnimationMessage,
     BeginPlayerAnimationMessage,
+    CameraController,
+    ClickBehaviour,
     ClickMessage,
     CloseHudMessage,
+    CustomNetworkTransformGeneric,
     DeleteChatMessageMessage,
     DeleteGameOptionMessage,
     DisplayStartGameScreenMessage,
     DisplaySystemAnnouncementMessage,
     FetchResourceMessage,
+    Graphic,
     ModstampSetStringMessage,
+    MouthwashSpawnType,
     PingPacket,
     SetChatMessageMessage,
     SetChatVisibilityMessage,
@@ -28,7 +35,8 @@ import {
     SetHudVisibility,
     SetPlayerOpacityMessage,
     SetPlayerOutlineMessage,
-    SetQrContentsMessage
+    SetQrContentsMessage,
+    SoundSource
 } from "mouthwash-types";
 
 import { MouthwashApiPlugin, ClientFetchResourceResponseEvent } from "hbplugin-mouthwashgg-api";
@@ -53,6 +61,9 @@ import { MouthwashApiPlugin, ClientFetchResourceResponseEvent } from "hbplugin-m
 @RegisterMessage(SetPlayerOutlineMessage)
 @RegisterMessage(SetPlayerOpacityMessage)
 @RegisterMessage(SetQrContentsMessage)
+@RegisterPrefab(MouthwashSpawnType.Button, [ CustomNetworkTransformGeneric, Graphic, ClickBehaviour ] as typeof Networkable[])
+@RegisterPrefab(MouthwashSpawnType.SoundSource, [ SoundSource, CustomNetworkTransformGeneric ] as typeof Networkable[])
+@RegisterPrefab(MouthwashSpawnType.CameraController, [ CameraController ] as typeof Networkable[])
 export class MouthwashPlugin extends WorkerPlugin {
     constructor(
         public readonly worker: Worker,

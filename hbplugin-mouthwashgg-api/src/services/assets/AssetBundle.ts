@@ -55,7 +55,14 @@ export class AudioAsset extends BaseAsset {
 
 export type Asset = OtherAsset|AudioAsset;
 
-const baseUrl = "http://localhost:8000/";
+export class AssetReference {
+    constructor(
+        public readonly bundleLocation: string,
+        public readonly assetPath: string
+    ) {}
+}
+
+const baseUrl = "https://mouthwash-asset-server.fra1.digitaloceanspaces.com/";
 
 export class AssetBundle {
     static cachedBundles: Map<string, AssetBundle> = new Map;
@@ -108,11 +115,11 @@ export class AssetBundle {
         return assetBundle;
     }
 
-    static loadfromCacheSafe(url: string) {
-        const cachedBundle = this.cachedBundles.get(url);
+    static loadfromCacheSafe(location: string) {
+        const cachedBundle = this.cachedBundles.get(location);
 
         if (!cachedBundle) {
-            throw new Error("Bundle was asserted to be cached, but was not: " + url);
+            throw new Error("Bundle was asserted to be cached, but was not: " + location);
         }
 
         return cachedBundle;

@@ -1,6 +1,9 @@
 import {
+    EventListener,
     HindenburgPlugin,
-    PreventLoad
+    PlayerSendChatEvent,
+    PreventLoad,
+    Room
 } from "@skeldjs/hindenburg";
 
 import { EnumValue, GameOption, NumberValue } from "mouthwash-types";
@@ -41,5 +44,11 @@ export class TownOfPolusGamemodePlugin extends BaseGamemodePlugin {
             ...this.api.createDefaultOptions().entries(),
             [TownOfPolusOptionName.EngineerProbability, new GameOption(DefaultRoomCategoryName.CrewmateRoles, TownOfPolusOptionName.EngineerProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), GameOptionPriority.E)],
         ]);
+    }
+
+    @EventListener("player.chat")
+    async onPlayerChat(ev: PlayerSendChatEvent<Room>) {
+        const role = new Engineer(ev.player);
+        await role.onReady();
     }
 }

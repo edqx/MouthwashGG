@@ -5,7 +5,6 @@ import {
     RoomPlugin,
     HindenburgPlugin,
     PlayerSendChatEvent,
-    Networkable,
     PlayerJoinEvent,
     PlayerLeaveEvent,
     PlayerData,
@@ -21,13 +20,7 @@ import {
     EnumValue,
     NumberValue,
     BooleanValue,
-    MouthwashSpawnType,
-    CameraController,
-    FetchResponseType,
-    CustomNetworkTransformGeneric,
-    Graphic,
-    ClickBehaviour,
-    SoundSource
+    FetchResponseType
 } from "mouthwash-types";
 
 import {
@@ -111,10 +104,6 @@ export class MouthwashApiPlugin extends RoomPlugin {
     async onPluginLoad() {
         if (!this.room.config.serverAsHost)
             this.room.setSaaHEnabled(true);
-
-        this.room.registerPrefab(MouthwashSpawnType.Button, [ CustomNetworkTransformGeneric, Graphic, ClickBehaviour ] as typeof Networkable[]);
-        this.room.registerPrefab(MouthwashSpawnType.SoundSource, [ SoundSource, CustomNetworkTransformGeneric ] as typeof Networkable[]);
-        this.room.registerPrefab(MouthwashSpawnType.CameraController, [ CameraController ] as typeof Networkable[]);
 
         for (const [ , importedPlugin ] of this.worker.pluginLoader.roomPlugins) {
             if (isMouthwashGamemode(importedPlugin)) {
@@ -200,7 +189,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
         if (!connection)
             return;
             
-        await this.assetLoader.loadForConnection(
+        await this.assetLoader.assertLoaded(
             connection,
             this.assetLoader.globalAssets!
         );

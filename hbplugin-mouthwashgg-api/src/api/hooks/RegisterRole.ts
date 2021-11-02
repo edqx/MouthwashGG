@@ -5,7 +5,7 @@ import { isMouthwashRole } from "./MouthwashRole";
 const registeredRolesKey = Symbol("mouthwash:registeredRoles");
 
 export function RegisterRole(roleCtr: typeof BaseRole) {
-    return function (gamemodeCtr: typeof BaseGamemodePlugin) {
+    return function<T extends typeof BaseGamemodePlugin>(gamemodeCtr: T) {
         if (!isMouthwashRole(roleCtr)) {
             throw new Error("Tried to register a non-mouthwash role class, make sure you have used the @MouthwashRole decorator");
         }

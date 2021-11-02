@@ -29,7 +29,7 @@ Unfortunately, as Submerged was developed by another team separate from Polus.GG
 
 ##### 2. The only open source guarantee of Mouthwash is the actual Polus.gg gamemode and role API reimplementation to build gamemodes out of. Personally, I have great respect for retaining the integrity of Mouthwash's open source nature, however I will take the opportunity to make my own gamemodes initially private before open sourcing them at a later date.
 
-##### 3. While completely rewritten from the ground-up and using completely different server software, a substantial part of the development, as well as most art, was made previously by the rest of the Polus.gg developers. For this reason, the asset server as well as raw asset files is completely private-source and it should SOLELY be used to communicate with a Mouthwash.GG server.
+##### 3. While completely rewritten from the ground-up and using completely different server software, a substantial part of the development, as well as most art, was made previously by the rest of the Polus.gg developers. For this reason, the asset server (as well as raw asset files) is completely private-source and it should SOLELY be used to communicate with a Mouthwash.GG server.
 
 ### Notes
 Mouthwash is _very strictly_ available under the [SSPL](https://www.mongodb.com/licensing/server-side-public-license) license. You hold no right to distribute private modifications of the software (Clause 5), or have any intention to make a revenue from selling the software or any modifications of it (Clause 13). Any code contributed to Mouthwash is automatically agreed to be held under the same license.

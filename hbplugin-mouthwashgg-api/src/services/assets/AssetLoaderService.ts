@@ -8,7 +8,7 @@ import { AssetBundle } from "./AssetBundle";
 export class AssetLoaderService {
     globalAssets?: AssetBundle;
     
-    loadedBundles: WeakMap<Connection, Map<string, AssetBundle>>;
+    loadedBundles: WeakMap<Connection, Set<AssetBundle>>;
     waitingFor: WeakMap<Connection, Map<number, AssetBundle>>;
 
     constructor(
@@ -22,8 +22,15 @@ export class AssetLoaderService {
         this.globalAssets = await AssetBundle.loadFromUrl("PggResources/Global", false);
     }
 
-    async getLoadedBundles(connection: Connection) {
-        return this.loadedBundles.get(connection);
+    getLoadedBundles(connection: Connection) {
+        const cachedLoaded = this.loadedBundles.get(connection);
+        const loadedBundles = cachedLoaded || new Set;
+
+        if (!cachedLoaded) {
+            this.loadedBundles.set(connection, loadedBundles);
+        }
+
+        return loadedBundles;
     }
 
     getWaitingFor(connection: Connection) {
@@ -40,12 +47,15 @@ export class AssetLoaderService {
     async loadOnAll(assetBundle: AssetBundle) {
         const promises = [];
         for (const [ , connection ] of this.plugin.room.connections) {
-            promises.push(this.loadForConnection(connection, assetBundle));
+            promises.push(this.assertLoaded(connection, assetBundle));
         }
         await Promise.all(promises);
     }
 
-    async loadForConnection(connection: Connection, assetBundle: AssetBundle) {
+    async assertLoaded(connection: Connection, assetBundle: AssetBundle) {
+        if (this.getLoadedBundles(connection).has(assetBundle))
+            return;
+
         if (this.getWaitingFor(connection).has(assetBundle.bundleId))
             return;
 
@@ -74,11 +84,16 @@ export class AssetLoaderService {
             this.waitingFor.delete(connection);
         }
 
+        this.getLoadedBundles(connection).add(assetBundle);
+
         this.plugin.logger.info("Loaded asset bundle %s for %s",
             assetBundle.url, connection);
     }
 
     waitForLoaded(connection: Connection, assetBundle: AssetBundle, timeout = 60000) {
+        if (this.getLoadedBundles(connection).has(assetBundle))
+            return Promise.resolve();
+
         return new Promise<void>((resolve, reject) => {
             const plugin = this.plugin;
 

@@ -1,5 +1,6 @@
-import { PlayerData, Room } from "@skeldjs/hindenburg";
-import { AnyGameOptionType, GameOption } from "mouthwash-types";
+import { PlayerData, Room, Vector2 } from "@skeldjs/hindenburg";
+import { AnyGameOptionType, EdgeAlignment, GameOption, KeyCode, Palette } from "mouthwash-types";
+import { AssetBundle, AssetReference, ButtonSpawnInfo } from "../services";
 import { MouthwashApiPlugin } from "../plugin";
 import { RoleMetadata, StartGameScreen } from "./interfaces";
 
@@ -9,6 +10,8 @@ export class RoleGameOption {
         public readonly value: AnyGameOptionType
     ) {}
 }
+
+const baseButtonPosition = new Vector2(-2.1, -0.7);
 
 export class BaseRole {
     static metadata: RoleMetadata;
@@ -33,6 +36,55 @@ export class BaseRole {
     }
 
     async onReady() {}
+
+    async spawnButton(buttonId: string, assetRef: AssetReference, buttonInfo: Partial<ButtonSpawnInfo>) {
+        const playerButtons = this.api.buttonService.getButtons(this.player);
+
+        const cachedButton = playerButtons.get(buttonId);
+        if (cachedButton) {
+            return cachedButton;
+        }
+
+        const row = playerButtons.size % 2;
+        const column = Math.floor(playerButtons.size / 2);
+
+        const assetBundle = await AssetBundle.loadFromUrl(assetRef.bundleLocation, false);
+        const asset = assetBundle.getAssetSafe(assetRef.assetPath);
+
+        const connection = this.room.connections.get(this.player.clientId);
+        if (connection) {
+            await this.api.assetLoader.assertLoaded(
+                connection,
+                assetBundle
+            );
+            await this.api.assetLoader.waitForLoaded(connection, assetBundle);
+        }
+
+        const spawnInfo: ButtonSpawnInfo = {
+            position: baseButtonPosition
+                .add(new Vector2(
+                    column * -1.4,
+                    row * -1.4
+                )),
+            alignment: EdgeAlignment.RightBottom,
+            asset,
+            maxTimer: 10,
+            currentTime: 10,
+            saturated: false,
+            color: Palette.white(),
+            isCountingDown: true,
+            z: -9,
+            attachedTo: -1,
+            keys: [],
+            ...buttonInfo
+        };
+
+        return await this.api.buttonService.spawnButton(
+            this.player,
+            buttonId,
+            spawnInfo
+        );
+    }
 
     getTeamPlayers() {
         const playersOnTeam = [];

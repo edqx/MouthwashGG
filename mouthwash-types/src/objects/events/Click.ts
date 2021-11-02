@@ -8,7 +8,7 @@ export class ClickBehaviourClickEvent extends BasicEvent {
 
     constructor(
         public readonly clickBehaviour: ClickBehaviour,
-        public readonly message: ClickMessage
+        public readonly message: ClickMessage|undefined
     ) {
         super();
     }

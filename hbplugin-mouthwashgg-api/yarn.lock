@@ -19,9 +19,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg%40workspace%3A.":
+"@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg-api%40workspace%3A.":
   version: 0.0.0-use.local
-  resolution: "@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg%40workspace%3A."
+  resolution: "@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg-api%40workspace%3A."
   languageName: node
   linkType: soft
 
@@ -221,9 +221,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hbplugin-mouthwashgg@workspace:.":
+"hbplugin-mouthwashgg-api@workspace:.":
   version: 0.0.0-use.local
-  resolution: "hbplugin-mouthwashgg@workspace:."
+  resolution: "hbplugin-mouthwashgg-api@workspace:."
   dependencies:
     "@skeldjs/events": ^2.13.10
     "@skeldjs/hindenburg": "link:../../Hindenburg"
@@ -307,9 +307,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg%40workspace%3A.":
+"mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg-api%40workspace%3A.":
   version: 0.0.0-use.local
-  resolution: "mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg%40workspace%3A."
+  resolution: "mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg-api%40workspace%3A."
   languageName: node
   linkType: soft
 

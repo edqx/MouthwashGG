@@ -54,6 +54,13 @@ export class ClickBehaviour extends Networkable<ClickBehaviourData, ClickBehavio
         this.keys ||= [];
     }
 
+    FixedUpdate(deltaTime: number) {
+        this.currentTime -= deltaTime;
+        if (this.currentTime < 0) {
+            this.currentTime = 0;
+        }
+    }
+
     async HandleRpc(rpc: BaseRpcMessage) {
         switch (rpc.messageTag) {
             case MouthwashRpcMessageTag.Click:
@@ -124,11 +131,11 @@ export class ClickBehaviour extends Networkable<ClickBehaviourData, ClickBehavio
         );
     }
 
-    async click(rpc: ClickMessage) {
+    async click() {
         await this.emit(
             new ClickBehaviourClickEvent(
                 this,
-                rpc
+                undefined
             )
         );
     }

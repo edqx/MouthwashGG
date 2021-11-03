@@ -11,7 +11,11 @@ import {
     PlayerCheckNameEvent,
     RoomSelectImpostorsEvent,
     RoomGameStartEvent,
-    GameMap
+    GameMap,
+    sleep,
+    PlayerMurderEvent,
+    RoomFixedUpdateEvent,
+    PlayerDieEvent
 } from "@skeldjs/hindenburg";
 
 import {
@@ -20,7 +24,9 @@ import {
     EnumValue,
     NumberValue,
     BooleanValue,
-    FetchResponseType
+    FetchResponseType,
+    HudLocation,
+    Palette
 } from "mouthwash-types";
 
 import {
@@ -29,7 +35,6 @@ import {
     ButtonService,
     CameraControllerService,
     ChatService,
-    DefaultRoomOptions,
     DefaultRoomOptionName,
     DefaultRoomCategoryName,
     GameOptionPriority,
@@ -39,11 +44,12 @@ import {
     QrCodeService,
     RoleService,
     SoundService,
-    SpoofInfoService
+    SpoofInfoService,
+    AssetBundle
 } from "./services";
 
-import { ClientFetchResourceResponseEvent, MouthwashUpdateGameOptionEvent } from "./events";
-import { BaseGamemodePlugin, getRegisteredRoles, isMouthwashGamemode } from "./api";
+import { ButtonFixedUpdateEvent, ClientFetchResourceResponseEvent, MouthwashUpdateGameOptionEvent } from "./events";
+import { BaseGamemodePlugin, getRegisteredBundles, getRegisteredRoles, isMouthwashGamemode } from "./api";
 
 const mapNameToGameMap = {
     "The Skeld": GameMap.TheSkeld,
@@ -59,7 +65,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
     buttonService: ButtonService;
     cameraControllers: CameraControllerService;
     chatService: ChatService;
-    gameOptions: GameOptionsService<AnyGameOptions>;
+    gameOptions: GameOptionsService;
     hudService: HudService;
     nameService: NameService;
     qrCodeService: QrCodeService;
@@ -86,7 +92,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
         this.hudService = new HudService(this);
         this.nameService = new NameService(this);
         this.qrCodeService = new QrCodeService(this);
-        this.roleService = new RoleService;
+        this.roleService = new RoleService(this);
         this.soundService = new SoundService(this);
         this.spoofInfo = new SpoofInfoService;
 
@@ -116,7 +122,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
     }
 
     createDefaultOptions() {
-        return new Map<keyof DefaultRoomOptions, GameOption>([
+        return new Map<string, GameOption>([
             [DefaultRoomOptionName.Map, new GameOption(DefaultRoomCategoryName.None, DefaultRoomOptionName.Map, new EnumValue([ "The Skeld", "Polus", "Mira HQ", "Airship" ], 0), GameOptionPriority.A)],
             [DefaultRoomOptionName.ImpostorCount, new GameOption(DefaultRoomCategoryName.None, DefaultRoomOptionName.ImpostorCount, new NumberValue(2, 1, 1, 3, false, "{0} Impostors"), GameOptionPriority.A + 1)],
             [DefaultRoomOptionName.MaxPlayerCount, new GameOption(DefaultRoomCategoryName.None, DefaultRoomOptionName.MaxPlayerCount, new NumberValue(15, 1, 4, 15, false, "{0} Players"), GameOptionPriority.A + 2)],
@@ -146,9 +152,17 @@ export class MouthwashApiPlugin extends RoomPlugin {
 
         const gamemodePlugin = await this.worker.pluginLoader.loadPlugin(gamemodePluginCtr, this.room) as BaseGamemodePlugin;
 
-        for (const registeredRole of getRegisteredRoles(gamemodePluginCtr)) {
+        const registeredRoles = getRegisteredRoles(gamemodePluginCtr);
+        for (const registeredRole of registeredRoles) {
             gamemodePlugin.registeredRoles.push(registeredRole);
         }
+
+        const registeredBundles = getRegisteredBundles(gamemodePluginCtr);
+        const promises = [];
+        for (const registeredBundle of registeredBundles) {
+            promises.push(AssetBundle.loadFromUrl(registeredBundle, false));
+        }
+        gamemodePlugin.registeredBundles = await Promise.all(promises);
 
         this.gamemode = gamemodePlugin;
         if (doTransition) {
@@ -158,6 +172,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
 
     async doGameOptionTransition() {
         if (this.gamemode) {
+            let help = 0;
             while (true) {
                 const newGameOptions = this.gamemode.getGameOptions();
 
@@ -176,8 +191,15 @@ export class MouthwashApiPlugin extends RoomPlugin {
                         option.setValue(cachedValue);
                     }
                 }
+
                 if (!await this.gameOptions.transitionTo(newGameOptions))
                     break;
+
+                help++;
+                if (help >= 5) {
+                    this.logger.warn("2 options with the same names in 2 different categories likely have the same name and is causing an infinite loop, breaking..")
+                    break;
+                }
             }
         }
     }
@@ -247,11 +269,21 @@ export class MouthwashApiPlugin extends RoomPlugin {
         }
     }
 
+    @EventListener("room.fixedupdate")
+    async onRoomFixedUpdate(ev: RoomFixedUpdateEvent<Room>) {
+        const players = [];
+        for (const [ , player ] of this.room.players) {
+            players.push(player);
+        }
+        await this.room.emit(new ButtonFixedUpdateEvent(players));
+    }
+
     @EventListener("mwgg.gameoption.update")
-    async onGameOptionUpdate(ev: MouthwashUpdateGameOptionEvent<DefaultRoomOptions, DefaultRoomOptionName.Gamemode>) {
+    async onGameOptionUpdate(ev: MouthwashUpdateGameOptionEvent) {
         if (ev.optionKey === DefaultRoomOptionName.Gamemode) {
-            if (ev.oldValue.selectedOption !== ev.newValue.selectedOption) {
-                await this.setGamemode(this.allGamemodes.get(ev.newValue.selectedOption)!, false);
+            const newValue = ev.getNewValue<EnumValue<string>>().selectedOption;
+            if (ev.getOldValue<EnumValue<string>>().selectedOption !== newValue) {
+                await this.setGamemode(this.allGamemodes.get(newValue)!, false);
             }
         }
 
@@ -309,5 +341,31 @@ export class MouthwashApiPlugin extends RoomPlugin {
         const selectedMap = mapGameOption?.getValue<EnumValue<keyof typeof mapNameToGameMap>>().selectedOption;
     
         this.room.settings.map = mapNameToGameMap[selectedMap || "The Skeld"];
+
+        if (this.gamemode) {
+            const promises = [];
+            for (const [ , connection ] of this.room.connections) {
+                for (const assetBundle of this.gamemode.registeredBundles) {
+                    await this.assetLoader.assertLoaded(connection, assetBundle);
+                    promises.push(this.assetLoader.waitForLoaded(connection, assetBundle));
+                }
+            }
+            await Promise.all(promises);
+        }
+
+        sleep(500).then(async () => {
+            const roleAssignments = this.roleService.getRoleAssignments(this.gamemode?.getRoleCounts() || []);
+            await this.roleService.assignAllRoles(roleAssignments);
+        });
+    }
+
+    @EventListener("player.die")
+    async onPlayerDie(ev: PlayerDieEvent<Room>) {
+        this.hudService.addHudStringFor(
+            HudLocation.TaskText,
+            "you-died-text",
+            Palette.impostorRed().text("You died"),
+            [ ev.player ]
+        );
     }
 }

@@ -78,7 +78,7 @@ export class AnimationService {
         const playerControl = player.control;
 
         if (!playerControl)
-            throw new Error("Player has no player control");
+            return;
             
         const connections = this.plugin.getConnections(sendTo);
 
@@ -101,7 +101,7 @@ export class AnimationService {
     }
 
     async setOutlineFor(player: PlayerData<Room>, color: RGBA, setFor: PlayerData[]) {
-        if (Array.isArray(setFor))
+        if (!Array.isArray(setFor))
             throw new TypeError("Expected array of players for 'setFor', got " + typeof setFor);
 
         await this._setOutline(player, true, color, setFor);
@@ -112,7 +112,7 @@ export class AnimationService {
     }
 
     async clearOutlineFor(player: PlayerData<Room>, setFor: PlayerData[]) {
-        if (Array.isArray(setFor))
+        if (!Array.isArray(setFor))
             throw new TypeError("Expected array of players for 'setFor', got " + typeof setFor);
 
         await this._setOutline(player, false, new RGBA(0, 0, 0, 0), setFor);
@@ -139,7 +139,7 @@ export class AnimationService {
     }
 
     async setOpacityFor(player: PlayerData<Room>, opacity: number, setFor: PlayerData[]) {
-        if (Array.isArray(setFor))
+        if (!Array.isArray(setFor))
             throw new TypeError("Expected array of players for 'setFor', got " + typeof setFor);
 
         await this._setOpacity(player, opacity, setFor);

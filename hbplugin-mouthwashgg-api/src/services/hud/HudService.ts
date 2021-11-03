@@ -10,7 +10,8 @@ import {
     SetChatVisibilityMessage,
     SetHudVisibility,
     SetHudStringMessage,
-    Palette
+    Palette,
+    AllowTaskInteractionMessage
 } from "mouthwash-types";
 
 import { MouthwashApiPlugin } from "../../plugin";
@@ -23,6 +24,7 @@ export class PlayerHudManager {
     chatVisible: boolean;
     modstampText: string;
     modstampColor: RGBA;
+    allowTaskInteraction: boolean;
 
     constructor() {
         this.hudItemVisibility = new Map;
@@ -30,6 +32,7 @@ export class PlayerHudManager {
         this.chatVisible = true;
         this.modstampText = "Playing on Mouthwash.gg";
         this.modstampColor = Palette.white();
+        this.allowTaskInteraction = true;
     }
 
     getFullHudString(location: HudLocation) {
@@ -40,8 +43,10 @@ export class PlayerHudManager {
         }
 
         let out = "";
+        let i = 0;
         for (const [ , text ] of hudStrings) {
-            out += text + "\n";
+            out += text + (i > 0 ? "\n" : "");
+            i++;
         }
         return out;
     }
@@ -315,5 +320,22 @@ export class HudService {
 
     getHudString(location: HudLocation, player: PlayerData) {
         return this.getPlayerHud(player).getFullHudString(location);
+    }
+
+    async setTaskInteraction(player: PlayerData, enabled: boolean) {
+        const hudManager = this.getPlayerHud(player);
+        hudManager.allowTaskInteraction = enabled;
+
+        const connection = this.plugin.room.connections.get(player.clientId);
+        if (connection) {
+            await connection.sendPacket(
+                new ReliablePacket(
+                    connection.getNextNonce(),
+                    [
+                        new AllowTaskInteractionMessage(enabled)
+                    ]
+                )
+            );
+        }
     }
 }

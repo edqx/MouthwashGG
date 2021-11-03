@@ -1,8 +1,9 @@
 import { PlayerData, Room, Vector2 } from "@skeldjs/hindenburg";
-import { AnyGameOptionType, EdgeAlignment, GameOption, KeyCode, Palette } from "mouthwash-types";
-import { AssetBundle, AssetReference, ButtonSpawnInfo } from "../services";
+import { AnyGameOptionType, EdgeAlignment, GameOption, Palette } from "mouthwash-types";
+import { AssetBundle, AssetReference, ButtonSpawnInfo, RoleAssignment } from "../services";
 import { MouthwashApiPlugin } from "../plugin";
 import { RoleMetadata, StartGameScreen } from "./interfaces";
+import { RoleRegisteredEventListenerInfo } from "./hooks";
 
 export class RoleGameOption {
     constructor(
@@ -24,11 +25,15 @@ export class BaseRole {
     room: Room;
     api: MouthwashApiPlugin;
 
+    registeredEventListeners: RoleRegisteredEventListenerInfo[];
+
     constructor(
         public readonly player: PlayerData<Room>
     ) {
         this.room = player.room;
         this.api = player.room.loadedPlugins.get("hbplugin-mouthwashgg-api") as MouthwashApiPlugin;
+
+        this.registeredEventListeners = [];
 
         if (!this.api) {
             throw new Error("Mouthwash API was not loaded on room");
@@ -97,7 +102,7 @@ export class BaseRole {
         return playersOnTeam;
     }
 
-    getStartGameScreen(): StartGameScreen {
+    getStartGameScreen(playerRoles: RoleAssignment[], impostorCount: number): StartGameScreen {
         return {
             titleText: this.metadata.roleName,
             subtitleText: this.metadata.roleObjective,
@@ -105,9 +110,18 @@ export class BaseRole {
             teamPlayers: this.getTeamPlayers()
         };
     }
+
+    getHudText() {
+        return this.metadata.themeColor.text("Role: " + this.metadata.roleName + "\n" + this.metadata.roleObjective);
+    }
 }
 
-export interface RoleCtr {
+export interface RoleCtr<T extends BaseRole = BaseRole> {
     metadata: RoleMetadata;
-    new(...args: any[]): BaseRole;
+    new(player: PlayerData<Room>): T;
+}
+
+export interface UntypedRoleCtr {
+    metadata: RoleMetadata;
+    new(...args: any): BaseRole;
 }

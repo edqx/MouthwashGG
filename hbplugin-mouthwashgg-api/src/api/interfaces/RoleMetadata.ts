@@ -1,4 +1,5 @@
 import { RGBA } from "mouthwash-types";
+import { Emoji } from "../../services";
 import { RoleAlignment } from "../enums";
 
 export interface RoleMetadata {
@@ -6,4 +7,5 @@ export interface RoleMetadata {
     roleObjective: string;
     alignment: RoleAlignment;
     themeColor: RGBA;
+    emoji: Emoji;
 }

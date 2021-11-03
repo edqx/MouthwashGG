@@ -98,26 +98,41 @@ export class ClickBehaviour extends Networkable<ClickBehaviourData, ClickBehavio
     }
 
     setColor(color: RGBA) {
+        if (this.color === color)
+            return;
+
         this.color = color;
         this.dirtyBit = 1;
     }
 
     setSaturated(saturated: boolean) {
+        if (this.saturated === saturated)
+            return;
+
         this.saturated = saturated;
         this.dirtyBit = 1;
     }
 
     setCountingDown(countingDown: boolean) {
+        if (this.countingDown === countingDown)
+            return;
+
         this.countingDown = countingDown;
         this.dirtyBit = 1;
     }
 
-    setCurrentTime(time: number) {
-        this.currentTime = time;
+    setCurrentTime(currentTime: number) {
+        if (this.currentTime === currentTime)
+            return;
+
+        this.currentTime = currentTime;
         this.dirtyBit = 1;
     }
 
     setMaxTimer(maxTimer: number) {
+        if (this.maxTimer === maxTimer)
+            return;
+
         this.maxTimer = maxTimer;
         this.dirtyBit = 1;
     }

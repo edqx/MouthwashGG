@@ -9,7 +9,8 @@ import {
     DeleteGameOptionMessage,
     AnyGameOptionType,
     AnyGameOptions,
-    MouthwashRootMessageTag
+    MouthwashRootMessageTag,
+    Palette
 } from "mouthwash-types";
 
 import { chunkArr } from "../../util/chunkArr";
@@ -56,59 +57,36 @@ export enum GameOptionPriority {
     Z = 2600
 }
 
-export enum DefaultRoomOptionName {
-    Gamemode = "Gamemode",
-    Map = "Map",
-    ImpostorCount = "Impostor Count",
-    MaxPlayerCount = "Max Player Count",
-    EmergencyMeetings = "Emergency Meetings",
-    EmergencyCooldown = "Emergency Cooldown",
-    DiscussionTime = "Discussion Time",
-    VotingTime = "Voting Time",
-    AnonymousVotes = "Anonymous Votes",
-    ConfirmEjects = "Confirm Ejects",
-    PlayerSpeed = "Player Speed",
-    CrewmateVision = "<color=#8cffff>Crewmate</color> Vision",
-    ImpostorVision = "<color=#ff1919>Impostor</color> Vision",
-    ImpostorKillCooldown = "<color=#ff1919>Impostor</color> Kill Cooldown",
-    ImpostorKillDistance = "<color=#ff1919>Impostor</color> Kill Distance",
-    CommonTasks = "Common Tasks",
-    LongTasks = "Long Tasks",
-    ShortTasks = "Short Tasks",
-    VisualTasks = "Visual Tasks",
-    TaskBarUpdates = "Task Bar Updates"
-}
+export const DefaultRoomOptionName = {
+    Gamemode: "Gamemode",
+    Map: "Map",
+    ImpostorCount: "Impostor Count",
+    MaxPlayerCount: "Max Player Count",
+    EmergencyMeetings: "Emergency Meetings",
+    EmergencyCooldown: "Emergency Cooldown",
+    DiscussionTime: "Discussion Time",
+    VotingTime: "Voting Time",
+    AnonymousVotes: "Anonymous Votes",
+    ConfirmEjects: "Confirm Ejects",
+    PlayerSpeed: "Player Speed",
+    CrewmateVision: `${Palette.crewmateBlue().text("Crewmate")} Vision`,
+    ImpostorVision: `${Palette.impostorRed().text("Impostor")} Vision`,
+    ImpostorKillCooldown: `${Palette.impostorRed().text("Impostor")} Kill Cooldown`,
+    ImpostorKillDistance: `${Palette.impostorRed().text("Impostor")} Kill Distance`,
+    CommonTasks: "Common Tasks",
+    LongTasks: "Long Tasks",
+    ShortTasks: "Short Tasks",
+    VisualTasks: "Visual Tasks",
+    TaskBarUpdates: "Task Bar Updates"
+} as const;
 
 export type AnyMap = "The Skeld"|"Polus"|"Mira HQ"|"Airship"|"Submerged";
 export type AnyImpostorKillDistance = "Short"|"Normal"|"Long";
 export type AnyTaskbarUpdate = "Always"|"Meetings"|"Never";
 
-export type DefaultRoomOptions = {
-    [DefaultRoomOptionName.Gamemode]: EnumValue<string>;
-    [DefaultRoomOptionName.Map]: EnumValue<AnyMap>;
-    [DefaultRoomOptionName.ImpostorCount]: NumberValue;
-    [DefaultRoomOptionName.MaxPlayerCount]: NumberValue;
-    [DefaultRoomOptionName.EmergencyMeetings]: NumberValue;
-    [DefaultRoomOptionName.EmergencyCooldown]: NumberValue;
-    [DefaultRoomOptionName.DiscussionTime]: NumberValue;
-    [DefaultRoomOptionName.VotingTime]: NumberValue;
-    [DefaultRoomOptionName.AnonymousVotes]: BooleanValue;
-    [DefaultRoomOptionName.ConfirmEjects]: BooleanValue;
-    [DefaultRoomOptionName.PlayerSpeed]: NumberValue;
-    [DefaultRoomOptionName.CrewmateVision]: NumberValue;
-    [DefaultRoomOptionName.ImpostorVision]: NumberValue;
-    [DefaultRoomOptionName.ImpostorKillCooldown]: NumberValue;
-    [DefaultRoomOptionName.ImpostorKillDistance]: EnumValue<AnyImpostorKillDistance>;
-    [DefaultRoomOptionName.CommonTasks]: NumberValue;
-    [DefaultRoomOptionName.LongTasks]: NumberValue;
-    [DefaultRoomOptionName.ShortTasks]: NumberValue;
-    [DefaultRoomOptionName.VisualTasks]: BooleanValue;
-    [DefaultRoomOptionName.TaskBarUpdates]: EnumValue<AnyTaskbarUpdate>;
-}
-
-export class GameOptionsService<GameOptionsType extends AnyGameOptions> {
+export class GameOptionsService {
     updateQueue: Map<number, SetGameOptionMessage|DeleteGameOptionMessage>;
-    gameOptions: Map<keyof GameOptionsType, GameOption>;
+    gameOptions: Map<string, GameOption>;
 
     cachedValues: Map<string, AnyGameOptionType>;
 
@@ -135,7 +113,7 @@ export class GameOptionsService<GameOptionsType extends AnyGameOptions> {
 
         const cachedValue = this.getCachedValue(option);
         if (cachedValue) {
-            option.setValue(cachedValue as GameOptionsType[keyof GameOptionsType]);
+            option.setValue(cachedValue);
         }
 
         this.gameOptions.set(option.key, option);
@@ -147,7 +125,7 @@ export class GameOptionsService<GameOptionsType extends AnyGameOptions> {
         ]);
     }
 
-    async setOption<K extends keyof GameOptionsType>(key: K, value: GameOptionsType[K], validate = false) {
+    async setOption(key: string, value: AnyGameOptionType, validate = false) {
         const gameOption = this.gameOptions.get(key) as GameOption;
 
         if (!gameOption)
@@ -167,14 +145,14 @@ export class GameOptionsService<GameOptionsType extends AnyGameOptions> {
             new MouthwashUpdateGameOptionEvent(
                 this.plugin.room,
                 this,
-                gameOption.key as K,
-                oldValue as GameOptionsType[K],
+                gameOption.key,
+                oldValue,
                 gameOption.getValue()
             )
         );
     }
 
-    async deleteOption(key: keyof GameOptionsType) {
+    async deleteOption(key: string) {
         const gameOption = this.gameOptions.get(key);
 
         if (!gameOption)
@@ -205,7 +183,7 @@ export class GameOptionsService<GameOptionsType extends AnyGameOptions> {
                     this.plugin.room,
                     this,
                     gameOption.key,
-                    oldValue as GameOptionsType[string],
+                    oldValue,
                     gameOption.getValue()
                 )
             );

@@ -1,20 +1,22 @@
 import { RGBA } from "mouthwash-types";
+import { Emoji } from "../../services";
 import { RoleMetadata } from "../interfaces";
 import { RoleAlignment } from "../enums";
-import { RoleCtr } from "../Role";
+import { RoleCtr, UntypedRoleCtr } from "../BaseRole";
 import { getRoleObjective } from "./RoleObjective";
 
 const mouthwashRoleKey = Symbol("mouthwash:roleMetadata");
 
-export function MouthwashRole(roleName: string, alignment: RoleAlignment, themeColor: RGBA) {
-    return function<T extends RoleCtr>(constructor: T) {
+export function MouthwashRole(roleName: string, alignment: RoleAlignment, themeColor: RGBA, emoji: Emoji) {
+    return function<T extends UntypedRoleCtr>(constructor: T) {
         Reflect.defineMetadata(mouthwashRoleKey, true, constructor);
 
         const roleMetadata: RoleMetadata = {
             roleName,
             roleObjective: getRoleObjective(constructor) || "",
             alignment,
-            themeColor
+            themeColor,
+            emoji
         };
 
         return class extends constructor {

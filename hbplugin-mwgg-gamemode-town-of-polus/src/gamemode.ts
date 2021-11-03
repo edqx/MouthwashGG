@@ -9,6 +9,7 @@ import {
 import { EnumValue, GameOption, NumberValue } from "mouthwash-types";
 
 import {
+    RegisterBundle,
     BaseGamemodePlugin,
     DefaultRoomCategoryName,
     GamemodePlugin,
@@ -18,15 +19,9 @@ import {
 
 import { Engineer } from "./roles";
 
-export enum TownOfPolusOptionName {
-    EngineerProbability = "<color=#f8bf14>Engineer</color> Probability",
-    EngineerUses = "<color=#f8bf14>Engineer</color> Uses"
-}
-
-export type TownofPolusOptions = {
-    [TownOfPolusOptionName.EngineerProbability]: NumberValue;
-    [TownOfPolusOptionName.EngineerUses]: EnumValue<"Per Round"|"Per Match">;
-};
+export const TownOfPolusOptionName = {
+    EngineerProbability: `${Engineer.metadata.themeColor.text("Engineer")} Probability`
+} as const;
 
 @PreventLoad
 @GamemodePlugin({
@@ -37,6 +32,7 @@ export type TownofPolusOptions = {
     author: "Edward Smale"
 })
 @RegisterRole(Engineer)
+@RegisterBundle("PggResources/TownOfPolus")
 @HindenburgPlugin("hbplugin-mwgg-gamemode-town-of-polus", "1.0.0", "none")
 export class TownOfPolusGamemodePlugin extends BaseGamemodePlugin {
     getGameOptions() {
@@ -46,9 +42,12 @@ export class TownOfPolusGamemodePlugin extends BaseGamemodePlugin {
         ]);
     }
 
-    @EventListener("player.chat")
-    async onPlayerChat(ev: PlayerSendChatEvent<Room>) {
-        const role = new Engineer(ev.player);
-        await role.onReady();
+    getRoleCounts() {
+        return [
+            {
+                role: Engineer,
+                playerCount: this.resolveChancePercentage(this.api.gameOptions.gameOptions.get(TownOfPolusOptionName.EngineerProbability)?.getValue<NumberValue>().value || 0)
+            }
+        ];
     }
 }

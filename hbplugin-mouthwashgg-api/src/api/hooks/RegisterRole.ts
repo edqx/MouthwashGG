@@ -1,19 +1,19 @@
 import { BaseGamemodePlugin } from "../BaseGamemodePlugin";
-import { BaseRole } from "../Role";
+import { BaseRole, RoleCtr } from "../BaseRole";
 import { isMouthwashRole } from "./MouthwashRole";
 
-const registeredRolesKey = Symbol("mouthwash:registeredRoles");
+const mouthwashRegisteredRolesKey = Symbol("mouthwash:registeredRoles");
 
-export function RegisterRole(roleCtr: typeof BaseRole) {
+export function RegisterRole(roleCtr: RoleCtr) {
     return function<T extends typeof BaseGamemodePlugin>(gamemodeCtr: T) {
         if (!isMouthwashRole(roleCtr)) {
             throw new Error("Tried to register a non-mouthwash role class, make sure you have used the @MouthwashRole decorator");
         }
 
-        const cachedRoles = Reflect.getMetadata(registeredRolesKey, gamemodeCtr);
-        const registeredRoles: typeof BaseRole[] = cachedRoles || [];
+        const cachedRoles = Reflect.getMetadata(mouthwashRegisteredRolesKey, gamemodeCtr);
+        const registeredRoles: RoleCtr[] = cachedRoles || [];
         if (!cachedRoles) {
-            Reflect.defineMetadata(registeredRolesKey, registeredRoles, gamemodeCtr);
+            Reflect.defineMetadata(mouthwashRegisteredRolesKey, registeredRoles, gamemodeCtr);
         }
 
         registeredRoles.push(roleCtr);
@@ -23,5 +23,5 @@ export function RegisterRole(roleCtr: typeof BaseRole) {
 }
 
 export function getRegisteredRoles(gamemodeCtr: typeof BaseGamemodePlugin): typeof BaseRole[] {
-    return Reflect.getMetadata(registeredRolesKey, gamemodeCtr) || [];
+    return Reflect.getMetadata(mouthwashRegisteredRolesKey, gamemodeCtr) || [];
 }

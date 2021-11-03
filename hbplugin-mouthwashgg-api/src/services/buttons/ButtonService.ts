@@ -44,6 +44,7 @@ export class Button extends EventEmitter<ButtonEvents> {
     clickBehaviour: ClickBehaviour;
 
     constructor(
+        public readonly service: ButtonService,
         public readonly id: string,
         public readonly player: PlayerData,
         public readonly customNetworkTransform: CustomNetworkTransformGeneric
@@ -55,12 +56,6 @@ export class Button extends EventEmitter<ButtonEvents> {
 
         this.clickBehaviour.on("mwgg.clickbehaviour.click", async () => {
             const ev = await this.emit(new ButtonClickEvent(this));
-
-            if (!ev.canceled) {
-                this.setCurrentTime(this.maxTimer);
-                this.setCountingDown(true);
-                this.setSaturated(false);
-            }
         });
     }
 
@@ -92,6 +87,7 @@ export class Button extends EventEmitter<ButtonEvents> {
         for (let i = 0; i < this.customNetworkTransform.components.length; i++) {
             this.customNetworkTransform.components[i].despawn();
         }
+        this.service.playerButtons.delete(this.player);
     }
 
     setColor(color: RGBA) {
@@ -116,6 +112,28 @@ export class Button extends EventEmitter<ButtonEvents> {
 
     async click() {
         await this.clickBehaviour.click();
+    }
+
+    getPlayersInRange(players: PlayerData<Room>[], range: number, filter?: (player: PlayerData<Room>) => boolean) {
+        if (!this.player.transform)
+            return [];
+
+        return players
+            .filter(player => {
+                if (player === this.player)
+                    return false;
+
+                if (!player.transform)
+                    return false;
+
+                if (this.player.transform!.position.dist(player.transform.position) > range)
+                    return false;
+
+                if (player.info?.isDead)
+                    return false;
+
+                return !filter || filter(player);
+            });
     }
 }
 
@@ -223,7 +241,7 @@ export class ButtonService {
             ], undefined, [ connection ]);
         }
 
-        const button = new Button(buttonId, player, spawnedObject);
+        const button = new Button(this, buttonId, player, spawnedObject);
         buttons.set(buttonId, button);
 
         return button;

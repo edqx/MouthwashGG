@@ -56,7 +56,9 @@ export class AssetLoaderService {
         if (this.getLoadedBundles(connection).has(assetBundle))
             return;
 
-        if (this.getWaitingFor(connection).has(assetBundle.bundleId))
+        const waitingFor = this.getWaitingFor(connection);
+
+        if (waitingFor.has(assetBundle.bundleId))
             return;
 
         await connection.sendPacket(
@@ -73,7 +75,7 @@ export class AssetLoaderService {
             )
         );
 
-        this.getWaitingFor(connection).set(assetBundle.bundleId, assetBundle);
+        waitingFor.set(assetBundle.bundleId, assetBundle);
     }
 
     onLoaded(connection: Connection, assetBundle: AssetBundle) {

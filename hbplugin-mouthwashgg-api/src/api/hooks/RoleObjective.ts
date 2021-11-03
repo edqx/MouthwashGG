@@ -1,14 +1,10 @@
-import { RoleCtr } from "../Role";
+import { RoleCtr } from "../BaseRole";
 
 const roleObjectiveKey = Symbol("mouthwash:role.objective");
 
 export function RoleObjective(roleObjective: string) {
     return function<T extends RoleCtr>(constructor: T) {
         Reflect.defineMetadata(roleObjectiveKey, roleObjective, constructor);
-
-        if (constructor.metadata) {
-            constructor.metadata.roleObjective = roleObjective;
-        }
         
         return constructor;
     }

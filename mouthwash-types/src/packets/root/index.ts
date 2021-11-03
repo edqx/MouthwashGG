@@ -1,3 +1,4 @@
+export * from "./AllowTaskInteraction";
 export * from "./DeleteChatMessage";
 export * from "./DeleteGameOption";
 export * from "./DisplayStartGameScreen";

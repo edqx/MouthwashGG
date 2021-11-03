@@ -1,7 +1,8 @@
 import { Room, RoomPlugin } from "@skeldjs/hindenburg";
 import { GameOption } from "mouthwash-types";
-import { BaseRole } from "./Role";
+import { BaseRole } from "./BaseRole";
 import { MouthwashApiPlugin } from "../plugin";
+import { AssetBundle, RoleCount } from "../services";
 
 export interface GamemodeMetadata {
     id: string;
@@ -17,6 +18,7 @@ export class BaseGamemodePlugin extends RoomPlugin {
 
     api: MouthwashApiPlugin;
     registeredRoles: typeof BaseRole[];
+    registeredBundles: AssetBundle[];
 
     constructor(
         public readonly room: Room,
@@ -26,6 +28,7 @@ export class BaseGamemodePlugin extends RoomPlugin {
 
         this.api = room.loadedPlugins.get("hbplugin-mouthwashgg-api") as MouthwashApiPlugin;
         this.registeredRoles = [];
+        this.registeredBundles = [];
     }
 
     onPluginLoad() {
@@ -37,5 +40,13 @@ export class BaseGamemodePlugin extends RoomPlugin {
 
     getGameOptions(): Map<string, GameOption> {
         return this.api.createDefaultOptions();
+    }
+
+    getRoleCounts(): RoleCount[] {
+        return [];
+    }
+
+    resolveChancePercentage(percent: number) {
+        return Math.floor(percent / 100) + (Math.random() < ((percent % 100) / 100) ? 1 : 0);
     }
 }

@@ -1,6 +1,8 @@
 # Mouthwash.gg
 Mouthwash.gg is an _open source re-implementation_ of the Polus.gg backend, made with [Hindenburg](https://github.com/skeldjs/Hindenburg).
 
+![image](https://user-images.githubusercontent.com/60631511/140629842-4ef52dc1-cbef-4b50-8b4a-caef1f4d4350.png)
+
 ## Install
 Mouthwash.GG is still in development for the time being, check back later! (Or contribute!)
 

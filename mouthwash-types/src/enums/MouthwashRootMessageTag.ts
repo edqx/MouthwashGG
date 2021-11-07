@@ -2,7 +2,7 @@ export enum MouthwashRootMessageTag {
     FetchResource = 0x80,
     Resize,
     Intro,
-    EndGame,
+    OverwriteGameOver,
     SetHudString,
     DeclareHat,
     SetGameOption = 0x89,

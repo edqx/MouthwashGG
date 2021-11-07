@@ -20,7 +20,7 @@ export const __unset = Symbol("__unset");
 
 export class PlayerHudManager {
     hudItemVisibility: Map<HudItem, boolean>;
-    hudStrings: Map<HudLocation, [ string, string ][]>;
+    hudStrings: Map<HudLocation, [ string, string, number ][]>;
     chatVisible: boolean;
     modstampText: string;
     modstampColor: RGBA;
@@ -31,7 +31,7 @@ export class PlayerHudManager {
         this.hudStrings = new Map;
         this.chatVisible = true;
         this.modstampText = "Playing on Mouthwash.gg";
-        this.modstampColor = Palette.white();
+        this.modstampColor = Palette.white;
         this.allowTaskInteraction = true;
     }
 
@@ -42,11 +42,19 @@ export class PlayerHudManager {
             return __unset;
         }
 
+        if (!hudStrings.length)
+            return "";
+
         let out = "";
-        let i = 0;
-        for (const [ , text ] of hudStrings) {
-            out += text + (i > 0 ? "\n" : "");
-            i++;
+        for (let i = 0, j = 0; i < hudStrings.length; i++) {
+            const text = hudStrings[i][1];
+            if (text.length > 0) {
+                if (j > 0) {
+                    out += "\n";
+                }
+                out += text;
+                j++;
+            }
         }
         return out;
     }
@@ -231,7 +239,7 @@ export class HudService {
         await Promise.all(promises);
     }
 
-    private async _updateHudString(location: HudLocation, player: PlayerData, hudManager: PlayerHudManager) {
+    async updateHudString(location: HudLocation, player: PlayerData, hudManager: PlayerHudManager) {
         const connection = this.plugin.room.connections.get(player.clientId);
         if (connection) {
             const fullText = hudManager.getFullHudString(location);
@@ -252,7 +260,7 @@ export class HudService {
         }
     }
 
-    private async _addHudString(location: HudLocation, name: string, text: string, player: PlayerData) {
+    private async _setHudString(location: HudLocation, name: string, text: string, priority: number, player: PlayerData) {
         const hudManager = this.getPlayerHud(player);
         const cachedOverrides = hudManager.hudStrings.get(location);
         const overrides = cachedOverrides || [];
@@ -260,25 +268,51 @@ export class HudService {
             hudManager.hudStrings.set(location, overrides);
         }
 
-        overrides.push([ name, text ]);
-        await this._updateHudString(location, player, hudManager);
+        const idx = overrides.findIndex(([ key ]) => key === name);
+        if (idx > -1) {
+            overrides.splice(idx, 1);
+        }
+
+        const override: [string, string, number] = [ name, text, priority ];
+
+        if (overrides.length <= 0) { // this is all faster than sorting by priority I promise
+            overrides.push(override);
+        } else if (priority < overrides[0]?.[2]) {
+            overrides.unshift(override);
+        } else if (priority >= overrides[overrides.length - 1]?.[2]) {
+            overrides.push(override);
+        } else {
+            let flag = false;
+            for (let i = 0; i < overrides.length - 1; i++) {
+                if (priority >= overrides[i][2] && priority < overrides[i + 1][2]) {
+                    overrides.splice(i + 1, 0, override);
+                    flag = true;
+                    break;
+                }
+            }
+            if (!flag) {
+                overrides.push(override);
+            }
+        }
+
+        await this.updateHudString(location, player, hudManager);
     }
 
-    async addHudString(location: HudLocation, name: string, text: string) {
+    async setHudString(location: HudLocation, name: string, text: string, priority: number) {
         const promises = [];
         for (const [ , player ] of this.plugin.room.players) {
-            promises.push(this._addHudString(location, name, text, player));
+            promises.push(this._setHudString(location, name, text, priority, player));
         }
         await Promise.all(promises);
     }
 
-    async addHudStringFor(location: HudLocation, name: string, text: string, setFor: PlayerData[]) {
+    async setHudStringFor(location: HudLocation, name: string, text: string, priority: number, setFor: PlayerData[]) {
         if (!Array.isArray(setFor))
             throw new TypeError("Expected array of players for 'setFor', got " + typeof setFor);
 
         const promises = [];
         for (const player of setFor) {
-            promises.push(this._addHudString(location, name, text, player));
+            promises.push(this._setHudString(location, name, text, priority, player));
         }
         await Promise.all(promises);
     }
@@ -296,7 +330,7 @@ export class HudService {
             overrides.splice(idx, 1);
         }
 
-        await this._updateHudString(location, player, hudManager);
+        await this.updateHudString(location, player, hudManager);
     }
 
     async removeHudString(location: HudLocation, name: string) {
@@ -318,7 +352,18 @@ export class HudService {
         await Promise.all(promises);
     }
 
-    getHudString(location: HudLocation, player: PlayerData) {
+    getHudString(location: HudLocation, name: string, player: PlayerData) {
+        const hudManager = this.getPlayerHud(player);
+        const hudStrings = hudManager.hudStrings.get(location);
+
+        if (!hudStrings)
+            return "";
+
+        const override = hudStrings.find(([ key ]) => key === name);
+        return override?.[1] || "";
+    }
+
+    getFullHudText(location: HudLocation, player: PlayerData) {
         return this.getPlayerHud(player).getFullHudString(location);
     }
 
@@ -337,5 +382,29 @@ export class HudService {
                 )
             );
         }
+    }
+
+    async resetAllHuds() {
+        const promises = [];
+        for (const [ , player ] of this.plugin.room.players) {
+            promises.push(this.resetHud(player));
+        }
+        await Promise.all(promises);
+    }
+
+    async resetHud(player: PlayerData) {
+        const hudManager = this.getPlayerHud(player);
+        const promises = [];
+        promises.push(this.setChatVisibleFor(true, [ player ]));
+        promises.push(this.setModstampTextFor(undefined, Palette.white, [ player ]));
+        promises.push(this.setTaskInteraction(player, true));
+        for (const [ hudItem ] of hudManager.hudItemVisibility) {
+            promises.push(this.setHudItemVisibilityFor(hudItem, true, [ player ]));
+        }
+        for (const [ hudLocation ] of hudManager.hudStrings) {
+            hudManager.hudStrings.delete(hudLocation);
+            promises.push(this.updateHudString(hudLocation, player, hudManager));
+        }
+        await Promise.all(promises);
     }
 }

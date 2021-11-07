@@ -1,4 +1,5 @@
 import dgram from "dgram";
+import crypto from "crypto";
 
 import {
     HindenburgPlugin,
@@ -8,7 +9,8 @@ import {
     MessageHandler,
     PacketContext,
     RegisterPrefab,
-    Networkable
+    Networkable,
+    SendOption
 } from "@skeldjs/hindenburg";
 
 import {
@@ -27,6 +29,7 @@ import {
     Graphic,
     ModstampSetStringMessage,
     MouthwashSpawnType,
+    OverwriteGameOver,
     PingPacket,
     SetChatMessageMessage,
     SetChatVisibilityMessage,
@@ -40,6 +43,7 @@ import {
 } from "mouthwash-types";
 
 import { MouthwashApiPlugin, ClientFetchResourceResponseEvent } from "hbplugin-mouthwashgg-api";
+import { AccountService } from "./services";
 
 @HindenburgPlugin("hbplugin-mouthwashgg", "1.0.0", "none")
 @RegisterMessage(BeginCameraAnimationMessage)
@@ -52,6 +56,7 @@ import { MouthwashApiPlugin, ClientFetchResourceResponseEvent } from "hbplugin-m
 @RegisterMessage(DisplaySystemAnnouncementMessage)
 @RegisterMessage(FetchResourceMessage)
 @RegisterMessage(ModstampSetStringMessage)
+@RegisterMessage(OverwriteGameOver)
 @RegisterMessage(PingPacket)
 @RegisterMessage(SetChatMessageMessage)
 @RegisterMessage(SetChatVisibilityMessage)
@@ -65,11 +70,15 @@ import { MouthwashApiPlugin, ClientFetchResourceResponseEvent } from "hbplugin-m
 @RegisterPrefab(MouthwashSpawnType.SoundSource, [ SoundSource, CustomNetworkTransformGeneric ] as typeof Networkable[])
 @RegisterPrefab(MouthwashSpawnType.CameraController, [ CameraController ] as typeof Networkable[])
 export class MouthwashPlugin extends WorkerPlugin {
+    accountService: AccountService;
+
     constructor(
         public readonly worker: Worker,
         public readonly config: any
     ) {
         super(worker, config);
+
+        this.accountService = new AccountService(this);
 
         this.worker.socket.removeAllListeners();
         this.worker.socket.on("message", this.handlePossiblySignedMessage.bind(this));
@@ -100,13 +109,37 @@ export class MouthwashPlugin extends WorkerPlugin {
         }, 2000);
     }
 
-    handlePossiblySignedMessage(message: Buffer, rinfo: dgram.RemoteInfo) {
-        if (message[0] === 0x80) {
-            // todo
-            return this.worker.handleMessage(message.slice(37), rinfo);
+    async handlePossiblySignedMessage(message: Buffer, rinfo: dgram.RemoteInfo) {
+        if (message[0] === SendOption.Acknowledge) {
+            return this.worker.handleMessage(message, rinfo);
         }
 
-        return this.worker.handleMessage(message, rinfo);
+        if (message[0] === 0x80) {
+            const uuid = message.slice(1, 5).toString("hex") + "-"
+                + message.slice(5, 7).toString("hex") + "-"
+                + message.slice(7, 9).toString("hex") + "-"
+                + message.slice(9, 11).toString("hex") + "-"
+                + message.slice(11, 17).toString("hex");
+
+            const connection = this.worker.connections.get(rinfo.address + ":" + rinfo.port);
+            const cachedSession = connection && this.accountService.connectionSessions.get(connection);
+
+            const sessionInfo = (connection && cachedSession) || await this.accountService.getSession(uuid, rinfo.address);
+
+            if (sessionInfo) {
+                if (connection && !cachedSession) {
+                    this.accountService.connectionSessions.set(connection, sessionInfo);
+                }
+
+                const hmacHash = message.slice(17, 37);
+                const signedMessage = crypto.createHmac("sha1", sessionInfo.client_token).update(message.slice(37)).digest();
+                if (crypto.timingSafeEqual(hmacHash, signedMessage)) {
+                    return this.worker.handleMessage(message.slice(37), rinfo);
+                }
+            }
+        }
+
+        this.logger.warn("%s:%s sent unauthenticated message", rinfo.address + ":" + rinfo.port);
     }
 
     @MessageHandler(SetGameOptionMessage)
@@ -134,5 +167,9 @@ export class MouthwashPlugin extends WorkerPlugin {
                 message.response
             )
         );
+    }
+
+    async getUser(client_id: string) {
+
     }
 }

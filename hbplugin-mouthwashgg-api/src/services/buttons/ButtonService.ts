@@ -114,6 +114,21 @@ export class Button extends EventEmitter<ButtonEvents> {
         await this.clickBehaviour.click();
     }
 
+    getNearestPlayer(players: PlayerData<Room>[], range: number, filter?: (player: PlayerData<Room>) => boolean) {
+        const inRange = this.getPlayersInRange(players, range, filter);
+        let nearestDistance = Infinity;
+        let nearestPlayer: PlayerData<Room>|undefined = undefined;
+        for (let i = 0; i < inRange.length; i++) {
+            const player = inRange[i];
+            const dist = player.transform?.position.dist(this.player.transform!.position);
+            if (dist !== undefined && dist < nearestDistance) {
+                nearestDistance = dist;
+                nearestPlayer = player;
+            }
+        }
+        return nearestPlayer;
+    }
+
     getPlayersInRange(players: PlayerData<Room>[], range: number, filter?: (player: PlayerData<Room>) => boolean) {
         if (!this.player.transform)
             return [];
@@ -146,7 +161,7 @@ export class ButtonService {
         this.playerButtons = new WeakMap;
     }
 
-    getButtons(player: PlayerData): Map<string, Button> {
+    getPlayerButtons(player: PlayerData): Map<string, Button> {
         const cachedButtons = this.playerButtons.get(player);
         const buttons = cachedButtons || new Map;
 
@@ -158,7 +173,7 @@ export class ButtonService {
     }
 
     despawnAllButtons(player: PlayerData<Room>) {
-        const buttons = this.getButtons(player);
+        const buttons = this.getPlayerButtons(player);
         for (const [ , button ] of buttons) {
             button.destroy();
         }
@@ -166,7 +181,7 @@ export class ButtonService {
     }
 
     async spawnButton(player: PlayerData<Room>, buttonId: string, spawnInfo: Partial<ButtonSpawnInfo>) {
-        const buttons = this.getButtons(player);
+        const buttons = this.getPlayerButtons(player);
 
         if (buttons.has(buttonId))
             throw new Error("Player already has button with id '" + buttonId + "'");
@@ -243,6 +258,10 @@ export class ButtonService {
 
         const button = new Button(this, buttonId, player, spawnedObject);
         buttons.set(buttonId, button);
+
+        spawnedObject.on("component.despawn", () => {
+            this.getPlayerButtons(player).delete(buttonId);
+        });
 
         return button;
     }

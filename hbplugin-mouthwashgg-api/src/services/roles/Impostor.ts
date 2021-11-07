@@ -1,26 +1,28 @@
 import { PlayerData, PlayerDieEvent, Room } from "@skeldjs/hindenburg";
-import { EnumValue, KeyCode, NumberValue, Palette } from "mouthwash-types";
-import { ButtonFixedUpdateEvent } from "../../events";
+import { EnumValue, HudLocation, KeyCode, NumberValue, Palette, Priority } from "mouthwash-types";
 
 import {
-    AnyImpostorKillDistance,
-    AssetReference,
-    Button,
-    DefaultRoomOptionName,
-    EmojiService
-} from "../../services";
+    BaseRole,
+    EventListener,
+    ListenerType,
+    MouthwashRole,
+    RoleAlignment,
+    RoleObjective
+} from "../../api";
 
-import { BaseRole } from "../BaseRole";
-import { ListenerType, RoleAlignment } from "../enums";
-import { EventListener, MouthwashRole, RoleObjective } from "../hooks";
+import { ButtonFixedUpdateEvent } from "../../events";
+import { AssetReference } from "../assets";
+import { Button } from "../buttons";
+import { EmojiService } from "../emojis";
+import { AnyImpostorKillDistance, DefaultRoomOptionName } from "../gameOptions";
 
 const killDistanceToRange = {
     "Short": 1,
-    "Normal": 2,
+    "Medium": 2,
     "Long": 3
 };
 
-@MouthwashRole("Impostor", RoleAlignment.Impostor, Palette.impostorRed(), EmojiService.getEmoji("impostor"))
+@MouthwashRole("Impostor", RoleAlignment.Impostor, Palette.impostorRed, EmojiService.getEmoji("impostor"))
 @RoleObjective("Sabotage and kill the crewmates")
 export class Impostor extends BaseRole {
     protected _killRange: number;
@@ -32,12 +34,6 @@ export class Impostor extends BaseRole {
     constructor(player: PlayerData<Room>) {
         super(player);
 
-        this.api.hudService.setTaskInteraction(player, false);
-
-        if (this.player.playerId !== undefined) {
-            this.room.gameData?.players.get(this.player.playerId)?.setImpostor(true);
-        }
-
         this._killRange = killDistanceToRange[this.api.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillDistance)?.getValue<EnumValue<AnyImpostorKillDistance>>().selectedOption || "Short"];
         this._killCooldown = this.api.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillCooldown)?.getValue<NumberValue>().value || 45;
 
@@ -45,6 +41,10 @@ export class Impostor extends BaseRole {
     }
 
     async onReady() {
+        this.api.hudService.setTaskInteraction(this.player, false);
+        this.api.hudService.setHudStringFor(HudLocation.TaskText, "fake-tasks", Palette.impostorRed.text("Fake tasks:"), Priority.Z, [ this.player ]);
+        this.player.info?.setImpostor(true);
+
         this._killButton = await this.spawnButton(
             "kill-button",
             new AssetReference("PggResources/Global", "Assets/Mods/OfficialAssets/KillButton.png"),
@@ -71,32 +71,33 @@ export class Impostor extends BaseRole {
         });
     }
 
-    @EventListener("mwgg.button.fixedupdate", ListenerType.Room)
-    onButtonFixedUpdate(ev: ButtonFixedUpdateEvent) {
+    getTarget(players: PlayerData<Room>[]) {
         if (!this._killButton) {
-            if (this._target) {
-                this.api.animationService.setOutlineFor(this._target, Palette.null(), [ this.player ]);
-            }
-            this._target = undefined;
-            return;
+            return undefined;
         }
 
         if (this.player.physics && this.player.physics.ventid > -1) {
-            this._target = undefined;
-            return;
+            return undefined;
         }
 
-        const playersInRange = this._killButton.getPlayersInRange(ev.players, this._killRange);
+        return this._killButton.getNearestPlayer(players, this._killRange);
+    }
+
+    @EventListener("mwgg.button.fixedupdate", ListenerType.Room)
+    onButtonFixedUpdate(ev: ButtonFixedUpdateEvent) {
         const oldTarget = this._target;
-        this._target = playersInRange[0];
+        this._target = this.getTarget(ev.players);
 
-        if (!oldTarget && this._target) {
-            this.api.animationService.setOutlineFor(this._target, Palette.impostorRed(), [ this.player ]);
-        } else if (oldTarget && !this._target) {
-            this.api.animationService.setOutlineFor(oldTarget, Palette.null(), [ this.player ]);
+        if (this._target !== oldTarget) {
+            if (oldTarget) {
+                this.api.animationService.setOutlineFor(oldTarget, Palette.null, [ this.player ]);
+            }
+            if (this._target) {
+                this.api.animationService.setOutlineFor(this._target, Palette.impostorRed, [ this.player ]);
+            }
         }
 
-        this._killButton.setSaturated(!!this._target);
+        this._killButton?.setSaturated(!!this._target);
     }
     
     @EventListener("player.die", ListenerType.Player)

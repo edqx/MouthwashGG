@@ -1,0 +1,29 @@
+{
+    "name": "mouthwash-account-server",
+    "license": "SSPL-1.0",
+    "packageManager": "yarn@3.0.0-rc.13",
+    "main": "./dist/index.js",
+    "private": true,
+    "scripts": {
+        "build": "tsc -p ./",
+        "dev": "ts-node ./bin/index.ts",
+        "start": "node ./dist/bin/index.js"
+    },
+    "devDependencies": {
+        "@types/bcrypt": "^5.0.0",
+        "@types/chalk": "^2.2.0",
+        "@types/express": "^4.17.13",
+        "@types/pg": "^8.6.1",
+        "ts-node": "^10.4.0",
+        "typescript": "^4.4.4"
+    },
+    "dependencies": {
+        "bcrypt": "^5.0.1",
+        "chalk": "^4.1.2",
+        "dotenv": "^10.0.0",
+        "express": "^4.17.1",
+        "express-rate-limit": "^5.5.0",
+        "pg": "^8.7.1",
+        "postgres": "2.0.0-beta.10"
+    }
+}

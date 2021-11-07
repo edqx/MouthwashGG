@@ -9,5 +9,7 @@ export * from "./KeyCode";
 export * from "./MouthwashRootMessageTag";
 export * from "./MouthwashRpcMessageTag";
 export * from "./MouthwashSpawnType";
+export * from "./Priority";
 export * from "./ResourceType";
 export * from "./ResponseType";
+export * from "./WinSound";

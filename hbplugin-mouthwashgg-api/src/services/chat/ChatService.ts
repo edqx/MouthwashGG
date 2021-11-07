@@ -59,7 +59,7 @@ export class ChatService {
             sender.info?.skin ?? Skin.None,
             playerColor.dark,
             playerColor.light,
-            Palette.playerVisor() // standard visor colour
+            Palette.playerVisor // standard visor colour
         );
     }
 

@@ -5,6 +5,7 @@ export * from "./DisplayStartGameScreen";
 export * from "./DisplaySystemAnnouncement";
 export * from "./FetchResource";
 export * from "./ModstampSetString";
+export * from "./OverwriteGameOver";
 export * from "./SetChatMessage";
 export * from "./SetGameOption";
 export * from "./SetHudString";

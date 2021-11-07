@@ -4,7 +4,6 @@ import {
     AssetReference,
     BaseRole,
     Button,
-    Crewmate,
     EmojiService,
     EventListener,
     ListenerType,
@@ -32,7 +31,7 @@ export enum EngineerUses {
 
 @MouthwashRole("Engineer", RoleAlignment.Crewmate, engineerColor, EmojiService.getEmoji("engineer"))
 @RoleObjective("Fix sabotages and finish your tasks")
-export class Engineer extends Crewmate {
+export class Engineer extends BaseRole {
     static getGameOptions(gameOptions: Map<string, GameOption>) {
         const engineerOptions = new Map<any, any>([]);
 
@@ -69,16 +68,12 @@ export class Engineer extends Crewmate {
         });
     }
 
-    getStartGameScreen(playerRoles: RoleAssignment[], impostorCount: number) {
-        return BaseRole.prototype.getStartGameScreen.call(this, playerRoles, impostorCount);
-    }
-
     async spawnFixButton() {
         return await this.spawnButton("fix-button1", fixAsset, {
             maxTimer: 0.1,
             currentTime: 0,
             saturated: false,
-            color: Palette.white(),
+            color: Palette.white,
             isCountingDown: false
         });
     }

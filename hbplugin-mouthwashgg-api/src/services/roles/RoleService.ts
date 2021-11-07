@@ -1,12 +1,10 @@
-import { EventListener, PlayerData, ReliablePacket, Room } from "@skeldjs/hindenburg";
-import { DisplayStartGameScreenMessage, HudLocation, NumberValue } from "mouthwash-types";
+import { PlayerData, ReliablePacket, Room } from "@skeldjs/hindenburg";
+import { DisplayStartGameScreenMessage, HudLocation, NumberValue, Priority } from "mouthwash-types";
 
 import { shuffleArray } from "../../util/shuffleArray";
 
 import {
-    Crewmate,
     BaseRole,
-    Impostor,
     RoleAlignment,
     RoleCtr,
     RoleStringNames,
@@ -17,6 +15,8 @@ import {
 
 import { MouthwashApiPlugin } from "../../plugin";
 import { DefaultRoomOptionName } from "../gameOptions";
+import { Impostor } from "./Impostor";
+import { Crewmate } from "./Crewmate";
 
 export interface RoleCount {
     role: typeof BaseRole;
@@ -127,10 +127,11 @@ export class RoleService {
                 role.metadata.emoji,
                 [ role.player ]
             );
-            this.plugin.hudService.addHudStringFor(
+            this.plugin.hudService.setHudStringFor(
                 HudLocation.TaskText,
                 RoleStringNames.TaskObjective,
                 role.getHudText(),
+                Priority.A,
                 [ role.player ]
             );
             readyPromises.push(role.onReady());
@@ -156,7 +157,8 @@ export class RoleService {
             }
 
             const teamPlayerIds = [];
-            for (const player of teamPlayers) {
+            for (let i = 0; i < teamPlayers.length; i++) {
+                const player = teamPlayers[i];
                 const playerId = player.playerId;
                 if (playerId !== undefined) {
                     teamPlayerIds.push(playerId);
@@ -215,6 +217,15 @@ export class RoleService {
         return roleInstance;
     }
 
+    removeAllRoles() {
+        for (const [ , player ] of this.plugin.room.players) {
+            const playerRole = this.getPlayerRole(player);
+            if (playerRole) {
+                this.removeRole(playerRole);
+            }
+        }
+    }
+
     removeRole(role: BaseRole) {
         for (const event of role.registeredEventListeners) {
             if (event.type === ListenerType.Room) {
@@ -223,5 +234,6 @@ export class RoleService {
                 role.player.off(event.eventName, event.handler);
             }
         }
+        this.playerRoles.delete(role.player);
     }
 }

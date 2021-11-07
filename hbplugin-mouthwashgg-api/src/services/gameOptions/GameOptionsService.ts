@@ -2,13 +2,9 @@ import { Connection } from "@skeldjs/hindenburg";
 
 import {
     GameOption,
-    EnumValue,
-    BooleanValue,
-    NumberValue,
     SetGameOptionMessage,
     DeleteGameOptionMessage,
     AnyGameOptionType,
-    AnyGameOptions,
     MouthwashRootMessageTag,
     Palette
 } from "mouthwash-types";
@@ -28,35 +24,6 @@ export enum DefaultRoomCategoryName {
     Config = "Config"
 }
 
-export enum GameOptionPriority {
-    A = 100,
-    B = 200,
-    C = 300,
-    D = 400,
-    E = 500,
-    F = 600,
-    G = 700,
-    H = 800,
-    I = 900,
-    J = 1000,
-    K = 1100,
-    L = 1200,
-    M = 1300,
-    N = 1400,
-    O = 1500,
-    P = 1600,
-    Q = 1700,
-    R = 1800,
-    S = 1900,
-    T = 2000,
-    U = 2100,
-    V = 2200,
-    W = 2300,
-    X = 2400,
-    Y = 2500,
-    Z = 2600
-}
-
 export const DefaultRoomOptionName = {
     Gamemode: "Gamemode",
     Map: "Map",
@@ -69,10 +36,10 @@ export const DefaultRoomOptionName = {
     AnonymousVotes: "Anonymous Votes",
     ConfirmEjects: "Confirm Ejects",
     PlayerSpeed: "Player Speed",
-    CrewmateVision: `${Palette.crewmateBlue().text("Crewmate")} Vision`,
-    ImpostorVision: `${Palette.impostorRed().text("Impostor")} Vision`,
-    ImpostorKillCooldown: `${Palette.impostorRed().text("Impostor")} Kill Cooldown`,
-    ImpostorKillDistance: `${Palette.impostorRed().text("Impostor")} Kill Distance`,
+    CrewmateVision: `${Palette.crewmateBlue.text("Crewmate")} Vision`,
+    ImpostorVision: `${Palette.impostorRed.text("Impostor")} Vision`,
+    ImpostorKillCooldown: `${Palette.impostorRed.text("Impostor")} Kill Cooldown`,
+    ImpostorKillDistance: `${Palette.impostorRed.text("Impostor")} Kill Distance`,
     CommonTasks: "Common Tasks",
     LongTasks: "Long Tasks",
     ShortTasks: "Short Tasks",
@@ -81,7 +48,7 @@ export const DefaultRoomOptionName = {
 } as const;
 
 export type AnyMap = "The Skeld"|"Polus"|"Mira HQ"|"Airship"|"Submerged";
-export type AnyImpostorKillDistance = "Short"|"Normal"|"Long";
+export type AnyImpostorKillDistance = "Short"|"Medium"|"Long";
 export type AnyTaskbarUpdate = "Always"|"Meetings"|"Never";
 
 export class GameOptionsService {
@@ -108,9 +75,6 @@ export class GameOptionsService {
     }
 
     async createOption(option: GameOption) {
-        if (this.gameOptions.get(option.key))
-            throw new Error("Game option already created");
-
         const cachedValue = this.getCachedValue(option);
         if (cachedValue) {
             option.setValue(cachedValue);
@@ -123,6 +87,8 @@ export class GameOptionsService {
                 option
             )
         ]);
+
+        return option;
     }
 
     async setOption(key: string, value: AnyGameOptionType, validate = false) {

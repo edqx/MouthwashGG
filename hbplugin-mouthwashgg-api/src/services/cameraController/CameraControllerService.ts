@@ -62,6 +62,10 @@ export class CameraControllerService {
 
         this.cameras.set(player, spawnedObject);
 
+        spawnedObject.on("component.despawn", () => {
+            this.cameras.delete(player);
+        });
+
         return spawnedObject;
     }
 

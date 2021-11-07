@@ -1,3 +1,4 @@
+export * from "./account";
 export * from "./animation";
 export * from "./assets";
 export * from "./buttons";

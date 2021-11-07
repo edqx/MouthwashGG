@@ -43,7 +43,7 @@ export class BaseRole {
     async onReady() {}
 
     async spawnButton(buttonId: string, assetRef: AssetReference, buttonInfo: Partial<ButtonSpawnInfo>) {
-        const playerButtons = this.api.buttonService.getButtons(this.player);
+        const playerButtons = this.api.buttonService.getPlayerButtons(this.player);
 
         const cachedButton = playerButtons.get(buttonId);
         if (cachedButton) {
@@ -76,7 +76,7 @@ export class BaseRole {
             maxTimer: 10,
             currentTime: 10,
             saturated: false,
-            color: Palette.white(),
+            color: Palette.white,
             isCountingDown: true,
             z: -9,
             attachedTo: -1,

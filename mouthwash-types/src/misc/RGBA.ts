@@ -1,14 +1,5 @@
 import { Color, ColorCodes, HazelReader, HazelWriter } from "@skeldjs/hindenburg";
 
-export const Palette = {
-    "playerVisor": () =>  new RGBA(149, 202, 220, 255),
-    "crewmateBlue": () =>  new RGBA(140, 255, 255, 255),
-    "impostorRed": () =>  new RGBA(255, 25, 25, 255),
-    "null": () =>  new RGBA(0, 0, 0, 0),
-    "white": () =>  new RGBA(255, 255, 255, 255),
-    "black": () =>  new RGBA(0, 0, 0, 255)
-};
-
 export class RGBA {
     static playerBody(color: Color) {
         const colorCode = ColorCodes[color];
@@ -19,10 +10,10 @@ export class RGBA {
         };
     }
 
-    r: number;
-    g: number;
-    b: number;
-    a: number;
+    public readonly r: number;
+    public readonly g: number;
+    public readonly b: number;
+    public readonly a: number;
 
     constructor(
         r: number[]
@@ -54,10 +45,10 @@ export class RGBA {
 
     toString() {
         return "#"
-            + this.r.toString(16)
-            + this.g.toString(16)
-            + this.b.toString(16)
-            + this.a.toString(16);
+            + this.r.toString(16).padStart(2, "0")
+            + this.g.toString(16).padStart(2, "0")
+            + this.b.toString(16).padStart(2, "0")
+            + this.a.toString(16).padStart(2, "0");
     }
 
     static Deserialize(reader: HazelReader) {
@@ -85,11 +76,11 @@ export class RGBA {
     } as Record<keyof typeof Palette, (text: string) => string>;
 }
 
-function getText(colorName: keyof typeof Palette, text: string) {
-    return `<color=${Palette[colorName]().toString()}>${text}</color>`
-}
-
-for (const _colorName in Palette) {
-    const colorName = _colorName as keyof typeof Palette;
-    RGBA.text[colorName] = getText.bind(null, colorName);
-}
+export const Palette = {
+    "playerVisor": new RGBA(149, 202, 220, 255),
+    "crewmateBlue": new RGBA(140, 255, 255, 255),
+    "impostorRed": new RGBA(255, 25, 25, 255),
+    "null": new RGBA(0, 0, 0, 0),
+    "white": new RGBA(255, 255, 255, 255),
+    "black": new RGBA(0, 0, 0, 255)
+};

@@ -85,12 +85,12 @@ export class PlayerNameManagerPov extends PlayerNameManager {
 }
 
 export class PlayerNamesPerspective {
-    playerNames: Map<PlayerData, PlayerNameManagerPov>;
+    playerNames: WeakMap<PlayerData, PlayerNameManagerPov>;
 
     constructor(
         public readonly player: PlayerData
     ) {
-        this.playerNames = new Map;
+        this.playerNames = new WeakMap;
     }
 }
 
@@ -228,6 +228,30 @@ export class NameService {
         await Promise.all(promises);
     }
 
+    async updateNamesFor(fromPov: PlayerData) {
+        const promises = [];
+        const perspective = this.playerPerspectives.get(fromPov);
+        for (const [ , player ] of this.plugin.room.players) {
+            const nameManager = this.nameManagers.get(player);
+    
+            if (!nameManager) {
+                if (perspective) {
+                    const povNameManager = perspective.playerNames.get(player);
+                    if (povNameManager) {
+                        promises.push(this._updateName(perspective.player, povNameManager.player, povNameManager.getName()));
+                        continue;
+                    }
+                }
+    
+                promises.push(this._updateName(fromPov, player, player.info?.name ?? "???"));
+                continue;
+            }
+
+            promises.push(this._updateName(fromPov, player, nameManager.getName()));
+        }
+        await Promise.all(promises);
+    }
+
     async addEmoji(player: PlayerData, emoji: Emoji) {
         const nameManager = this.getNameManager(player);
         nameManager.emojis.add(emoji);
@@ -335,5 +359,24 @@ export class NameService {
         return nameManager?.getName()
             ?? player.info?.name
             ?? "???";
+    }
+
+    async resetAllNames() {
+        for (const [ , player ] of this.plugin.room.players) {
+            this.playerPerspectives.delete(player);
+            this.nameManagers.delete(player);
+        }
+        await this.updateAllNames();
+    }
+
+    async resetName(player: PlayerData) {
+        for (const [ , player ] of this.plugin.room.players) {
+            const perspective = this.playerPerspectives.get(player);
+            if (perspective) {
+                perspective.playerNames.delete(player);
+            }
+        }
+        this.nameManagers.delete(player);
+        await this.updateName(this.getNameManager(player));
     }
 }

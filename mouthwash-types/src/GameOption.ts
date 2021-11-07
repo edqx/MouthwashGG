@@ -25,6 +25,14 @@ export class EnumValue<T extends string> {
         }
     }
 
+    toJSON() {
+        return {
+            type: "enum",
+            options: this.options,
+            selectedIdx: this.selectedIdx
+        };
+    }
+
     compare(other: AnyGameOptionType) {
         if (!(other instanceof EnumValue))
             return false;
@@ -86,6 +94,13 @@ export class BooleanValue {
         writer.bool(this.enabled);
     }
 
+    toJSON() {
+        return {
+            type: "boolean",
+            enabled: this.enabled
+        };
+    }
+
     compare(other: AnyGameOptionType) {
         return other instanceof BooleanValue && this.enabled === other.enabled;
     }
@@ -128,6 +143,18 @@ export class NumberValue {
         writer.float(this.upper);
         writer.bool(this.zeroIsInfinity);
         writer.string(this.suffix);
+    }
+
+    toJSON() {
+        return {
+            type: "number",
+            value: this.value,
+            step: this.step,
+            lower: this.lower,
+            upper: this.upper,
+            zeroIsInfinity: this.zeroIsInfinity,
+            suffix: this.suffix
+        };
     }
 
     compare(other: AnyGameOptionType) {

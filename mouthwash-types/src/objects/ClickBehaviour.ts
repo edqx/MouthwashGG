@@ -49,7 +49,7 @@ export class ClickBehaviour extends Networkable<ClickBehaviourData, ClickBehavio
         this.maxTimer ||= 0;
         this.currentTime ||= 0;
         this.saturated ||= false;
-        this.color ||= Palette.white();
+        this.color ||= Palette.white;
         this.countingDown ||= false;
         this.keys ||= [];
     }

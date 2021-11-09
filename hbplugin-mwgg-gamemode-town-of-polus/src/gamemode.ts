@@ -9,10 +9,19 @@ import {
     RegisterRole
 } from "hbplugin-mouthwashgg-api";
 
-import { Engineer, Poisoner } from "./roles";
+import {
+    Engineer,
+    IdentityThief,
+    Jester,
+    Poisoner,
+    Sheriff
+} from "./roles";
 
 export const TownOfPolusOptionName = {
     EngineerProbability: `${Engineer.metadata.themeColor.text("Engineer")} Probability`,
+    SheriffProbability: `${Sheriff.metadata.themeColor.text("Sheriff")} Probability`,
+    IdentityThiefProbability: `${IdentityThief.metadata.themeColor.text("Identity Thief")} Probability`,
+    JesterProbability: `${Jester.metadata.themeColor.text("Jester")} Probability`,
     PoisonerProbability: `${Poisoner.metadata.themeColor.text("Poisoner")} Probability`
 } as const;
 
@@ -25,6 +34,9 @@ export const TownOfPolusOptionName = {
     author: "Edward Smale"
 })
 @RegisterRole(Poisoner)
+@RegisterRole(IdentityThief)
+@RegisterRole(Jester)
+@RegisterRole(Sheriff)
 @RegisterRole(Engineer)
 @RegisterBundle("PggResources/TownOfPolus")
 @HindenburgPlugin("hbplugin-mwgg-gamemode-town-of-polus", "1.0.0", "none")
@@ -33,7 +45,10 @@ export class TownOfPolusGamemodePlugin extends BaseGamemodePlugin {
         return new Map<any, any>([
             ...this.api.createDefaultOptions().entries(),
             [TownOfPolusOptionName.EngineerProbability, new GameOption(DefaultRoomCategoryName.CrewmateRoles, TownOfPolusOptionName.EngineerProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), Priority.E)],
-            [TownOfPolusOptionName.PoisonerProbability, new GameOption(DefaultRoomCategoryName.ImpostorRoles, TownOfPolusOptionName.PoisonerProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), Priority.E + 1)],
+            [TownOfPolusOptionName.SheriffProbability, new GameOption(DefaultRoomCategoryName.CrewmateRoles, TownOfPolusOptionName.SheriffProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), Priority.E + 1)],
+            [TownOfPolusOptionName.IdentityThiefProbability, new GameOption(DefaultRoomCategoryName.NeutralRoles, TownOfPolusOptionName.IdentityThiefProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), Priority.F)],
+            [TownOfPolusOptionName.JesterProbability, new GameOption(DefaultRoomCategoryName.NeutralRoles, TownOfPolusOptionName.JesterProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), Priority.F + 1)],
+            [TownOfPolusOptionName.PoisonerProbability, new GameOption(DefaultRoomCategoryName.ImpostorRoles, TownOfPolusOptionName.PoisonerProbability, new NumberValue(0, 10, 0, 100, false, "{0}%"), Priority.G + 2)]
         ]);
     }
 
@@ -42,6 +57,18 @@ export class TownOfPolusGamemodePlugin extends BaseGamemodePlugin {
             {
                 role: Engineer,
                 playerCount: this.resolveChancePercentage(this.api.gameOptions.gameOptions.get(TownOfPolusOptionName.EngineerProbability)?.getValue<NumberValue>().value || 0)
+            },
+            {
+                role: Sheriff,
+                playerCount: this.resolveChancePercentage(this.api.gameOptions.gameOptions.get(TownOfPolusOptionName.SheriffProbability)?.getValue<NumberValue>().value || 0)
+            },
+            {
+                role: IdentityThief,
+                playerCount: this.resolveChancePercentage(this.api.gameOptions.gameOptions.get(TownOfPolusOptionName.IdentityThiefProbability)?.getValue<NumberValue>().value || 0)
+            },
+            {
+                role: Jester,
+                playerCount: this.resolveChancePercentage(this.api.gameOptions.gameOptions.get(TownOfPolusOptionName.JesterProbability)?.getValue<NumberValue>().value || 0)
             },
             {
                 role: Poisoner,

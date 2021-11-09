@@ -1,4 +1,11 @@
-import { PlayerData, PlayerDieEvent, PlayerStartMeetingEvent, Room, SystemSabotageEvent, SystemStatus, SystemType } from "@skeldjs/hindenburg";
+import {
+    PlayerData,
+    PlayerDieEvent,
+    PlayerStartMeetingEvent,
+    Room,
+    SystemSabotageEvent,
+    SystemStatus
+} from "@skeldjs/hindenburg";
 
 import {
     AssetReference,
@@ -9,12 +16,12 @@ import {
     ListenerType,
     MouthwashRole,
     RoleAlignment,
-    RoleAssignment,
     RoleGameOption,
     RoleObjective
 } from "hbplugin-mouthwashgg-api";
 
 import { EnumValue, GameOption, NumberValue, Palette, RGBA } from "mouthwash-types";
+
 import { TownOfPolusOptionName } from "../gamemode";
 
 const engineerColor = new RGBA(248, 191, 20, 255);
@@ -33,14 +40,14 @@ export enum EngineerUses {
 @RoleObjective("Fix sabotages and finish your tasks")
 export class Engineer extends BaseRole {
     static getGameOptions(gameOptions: Map<string, GameOption>) {
-        const engineerOptions = new Map<any, any>([]);
+        const roleOptions = new Map<any, any>([]);
 
         const engineerProbability = gameOptions.get(TownOfPolusOptionName.EngineerProbability);
         if (engineerProbability && engineerProbability.getValue<NumberValue>().value > 0) {
-            engineerOptions.set(EngineerOptionName.EngineerUses, new RoleGameOption(EngineerOptionName.EngineerUses, new EnumValue([ "Per Round", "Per Match" ], 0)));
+            roleOptions.set(EngineerOptionName.EngineerUses, new RoleGameOption(EngineerOptionName.EngineerUses, new EnumValue([ "Per Round", "Per Match" ], 0)));
         }
 
-        return engineerOptions as Map<string, RoleGameOption>;
+        return roleOptions as Map<string, RoleGameOption>;
     }
 
     private _lastSabotagedSystem?: SystemStatus;
@@ -57,25 +64,30 @@ export class Engineer extends BaseRole {
     }
 
     async onReady() {
-        this._fixButton = await this.spawnFixButton();
-
-        this._fixButton.on("mwgg.button.click", ev => {
-            if (this._lastSabotagedSystem) {
-                this._lastSabotagedSystem.repair();
-                this._fixButton?.destroy();
-                this._fixButton = undefined;
-            }
-        });
+        await this.spawnFixButton();
     }
 
     async spawnFixButton() {
-        return await this.spawnButton("fix-button1", fixAsset, {
+        this._fixButton = await this.spawnButton("fix-button1", fixAsset, {
             maxTimer: 0.1,
             currentTime: 0,
             saturated: false,
             color: Palette.white,
             isCountingDown: false
         });
+
+        this._fixButton?.on("mwgg.button.click", ev => {
+            if (!this._lastSabotagedSystem || this.player.info?.isDead)
+                return;
+                    
+            this._lastSabotagedSystem.repair();
+            this._fixButton?.destroy();
+            this._fixButton = undefined;
+        });
+    }
+
+    async onRemove() {
+        this._fixButton?.destroy();
     }
 
     @EventListener("system.sabotage", ListenerType.Room)
@@ -86,8 +98,8 @@ export class Engineer extends BaseRole {
 
     @EventListener("player.startmeeting", ListenerType.Room)
     async onStartMeeting(ev: PlayerStartMeetingEvent<Room>) {
-        if (this._engineerUses === EngineerUses.PerRound && !this.player.info?.isDead) {
-            this._fixButton = await this.spawnFixButton();
+        if (this._engineerUses === EngineerUses.PerRound && !this.player.info?.isDead && !this._fixButton) {
+            await this.spawnFixButton();
         }
     }
 

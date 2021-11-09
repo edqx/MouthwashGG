@@ -1,6 +1,6 @@
 import { PlayerData } from "@skeldjs/hindenburg";
 import { RGBA, WinSound } from "mouthwash-types";
-import { AudioAsset } from "../..";
+import { AssetReference, AudioAsset } from "../../services";
 import { RoleAlignment } from "../enums";
 
 export interface EndGameScreen {
@@ -8,6 +8,6 @@ export interface EndGameScreen {
     subtitleText: string;
     backgroundColor: RGBA;
     yourTeam?: PlayerData[]|RoleAlignment;
-    winSound: WinSound|AudioAsset;
+    winSound: WinSound|AudioAsset|AssetReference;
     hasWon: boolean;
 }

@@ -1,9 +1,9 @@
-import { ClientDisconnectEvent, Connection, ReliablePacket } from "@skeldjs/hindenburg";
+import { ClientDisconnectEvent, Connection, PlayerData, ReliablePacket } from "@skeldjs/hindenburg";
 import { FetchResourceMessage, FetchResponseType, ResourceType } from "mouthwash-types";
 
 import { ClientFetchResourceResponseEvent } from "../..";
 import { MouthwashApiPlugin } from "../../plugin";
-import { AssetBundle } from "./AssetBundle";
+import { AssetBundle, AssetReference } from "./AssetBundle";
 
 export class AssetLoaderService {
     globalAssets?: AssetBundle;
@@ -126,5 +126,38 @@ export class AssetLoaderService {
             plugin.room.on("mwgg.client.fetchresponse", onFetchResponse);
             plugin.worker.on("client.disconnect", onClientDisconnect);
         });
+    }
+
+    async resolveAssetReference(assetRef: AssetReference) {
+        const assetBundle = await AssetBundle.loadFromUrl(assetRef.bundleLocation, false);
+        const asset = assetBundle.getAssetSafe(assetRef.assetPath);
+
+        const promises = [];
+        for (const [ , connection ] of this.plugin.room.connections) {
+            await this.assertLoaded(connection, assetBundle);
+            promises.push(this.waitForLoaded(connection, assetBundle));
+        }
+        await Promise.all(promises);
+        
+        return asset;
+    }
+
+    async resolveAssetReferenceFor(assetRef: AssetReference, setFor: PlayerData[]) {
+        const assetBundle = await AssetBundle.loadFromUrl(assetRef.bundleLocation, false);
+        const asset = assetBundle.getAssetSafe(assetRef.assetPath);
+
+        const connections = this.plugin.room.getConnections(setFor);
+
+        if (!connections)
+            return;
+
+        const promises = [];
+        for (const connection of connections) {
+            await this.assertLoaded(connection, assetBundle);
+            promises.push(this.waitForLoaded(connection, assetBundle));
+        }
+        await Promise.all(promises);
+        
+        return asset;
     }
 }

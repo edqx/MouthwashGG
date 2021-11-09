@@ -28,8 +28,13 @@ import {
     RpcMessage,
     SetInfectedMessage,
     TaskBarUpdate,
-    KillDistance
+    PlayerCompleteTaskEvent,
+    FinalTaskState,
+    PlayerMurderEvent,
+    PlayerStartMeetingEvent
 } from "@skeldjs/hindenburg";
+
+import { MouthwashAuthPlugin } from "hbplugin-mouthwashgg-auth";
 
 import {
     GameOption,
@@ -47,7 +52,6 @@ import {
 import {
     AnimationService,
     AssetLoaderService,
-    ButtonService,
     CameraControllerService,
     ChatService,
     DefaultRoomOptionName,
@@ -61,8 +65,9 @@ import {
     SpoofInfoService,
     AssetBundle,
     AnyTaskbarUpdate,
-    AnyImpostorKillDistance,
-    AccountService
+    AnyKillDistance,
+    DeadBodyService,
+    AssetReference
 } from "./services";
 
 import {
@@ -95,19 +100,21 @@ const taskBarUpdateNameToNumber = {
 };
 
 const killDistanceNameToNumber = {
-    "Short": KillDistance.Short,
-    "Medium": KillDistance.Medium,
-    "Long": KillDistance.Long
+    "Really Short": 0.5,
+    "Short": 1,
+    "Medium": 2,
+    "Long": 3
 };
 
 @HindenburgPlugin("hbplugin-mouthwashgg-api", "1.0.0", "last")
 export class MouthwashApiPlugin extends RoomPlugin {
-    accountService: AccountService;
+    private _authApi?: MouthwashAuthPlugin;
+
     animationService: AnimationService;
     assetLoader: AssetLoaderService;
-    buttonService: ButtonService;
     cameraControllers: CameraControllerService;
     chatService: ChatService;
+    deadBodyService: DeadBodyService;
     gameOptions: GameOptionsService;
     hudService: HudService;
     nameService: NameService;
@@ -117,7 +124,6 @@ export class MouthwashApiPlugin extends RoomPlugin {
     spoofInfo: SpoofInfoService;
 
     gamemode?: BaseGamemodePlugin;
-
     allGamemodes: Map<string, typeof BaseGamemodePlugin>;
 
     roomCreator?: Connection;
@@ -128,12 +134,11 @@ export class MouthwashApiPlugin extends RoomPlugin {
     ) {
         super(room, config);
 
-        this.accountService = new AccountService(this);
         this.animationService = new AnimationService(this);
         this.assetLoader = new AssetLoaderService(this);
-        this.buttonService = new ButtonService(this);
         this.cameraControllers = new CameraControllerService(this);
         this.chatService = new ChatService(this);
+        this.deadBodyService = new DeadBodyService(this);
         this.gameOptions = new GameOptionsService(this);
         this.hudService = new HudService(this);
         this.nameService = new NameService(this);
@@ -145,12 +150,9 @@ export class MouthwashApiPlugin extends RoomPlugin {
         this.allGamemodes = new Map;
     }
     
-    getConnections(players: PlayerData[]|undefined) {
-        return players
-            ? players
-                .map(player => this.room.connections.get(player.clientId))
-                .filter(_ => _) as Connection[]
-            : undefined;
+    get authApi() {
+        this._authApi ??= this.worker.loadedPlugins.get("hbplugin-mouthwashgg-auth") as MouthwashAuthPlugin|undefined;
+        return this._authApi;
     }
 
     async onPluginLoad() {
@@ -187,7 +189,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
             [DefaultRoomOptionName.CrewmateVision, new GameOption(DefaultRoomCategoryName.Roles, DefaultRoomOptionName.CrewmateVision, new NumberValue(0.75, 0.25, 0.25, 3, false, "{0}x"), Priority.D)],
             [DefaultRoomOptionName.ImpostorVision, new GameOption(DefaultRoomCategoryName.Roles, DefaultRoomOptionName.ImpostorVision, new NumberValue(0.75, 0.25, 0.25, 3, false, "{0}x"), Priority.D + 1)],
             [DefaultRoomOptionName.ImpostorKillCooldown, new GameOption(DefaultRoomCategoryName.Roles, DefaultRoomOptionName.ImpostorKillCooldown, new NumberValue(30, 2.5, 5, 60, false, "{0}s"), Priority.D + 2)],
-            [DefaultRoomOptionName.ImpostorKillDistance, new GameOption(DefaultRoomCategoryName.Roles, DefaultRoomOptionName.ImpostorKillDistance, new EnumValue(["Short", "Medium", "Long"], 1), Priority.D + 3)]
+            [DefaultRoomOptionName.ImpostorKillDistance, new GameOption(DefaultRoomCategoryName.Roles, DefaultRoomOptionName.ImpostorKillDistance, new EnumValue(["Really Short", "Short", "Medium", "Long"], 1), Priority.D + 3)]
         ]);
     }
 
@@ -227,7 +229,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
                     const roleOptions = registeredRole.getGameOptions(this.gameOptions.gameOptions);
                     let j = 0;
                     for (const [ key, option ] of roleOptions) {
-                        newGameOptions.set(key, new GameOption(DefaultRoomCategoryName.Config, option.key, option.value, Priority.F + i * 100 + j));
+                        newGameOptions.set(key, new GameOption(DefaultRoomCategoryName.Config, option.key, option.value, Priority.H + i * 100 + j));
                         j++;
                     }
                     i++;
@@ -272,7 +274,7 @@ export class MouthwashApiPlugin extends RoomPlugin {
             crewmateVision: this.gameOptions.gameOptions.get(DefaultRoomOptionName.CrewmateVision)?.getValue<NumberValue>().value,
             impostorVision: this.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorVision)?.getValue<NumberValue>().value,
             killCooldown: this.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillCooldown)?.getValue<NumberValue>().value,
-            killDistance: killDistanceNameToNumber[this.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillDistance)?.getValue<EnumValue<AnyImpostorKillDistance>>().selectedOption || "Medium"]
+            killDistance: killDistanceNameToNumber[this.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillDistance)?.getValue<EnumValue<AnyKillDistance>>().selectedOption || "Short"]
         });
     }
 
@@ -289,16 +291,23 @@ export class MouthwashApiPlugin extends RoomPlugin {
         );
     }
 
+    async updateUserSettings(clientId: string) {
+        if (!this.authApi)
+            return;
+
+        const gameSettings: any = {};
+        for (const [ gameOptionPath, gameOptionValue ] of this.gameOptions.cachedValues) {
+            gameSettings[gameOptionPath] = gameOptionValue.toJSON();
+        }
+        await this.authApi.updateUserSettings(clientId, gameSettings);
+    }
+
     @EventListener("client.leave")
     async onClientLeave(ev: ClientLeaveEvent) {
-        if (ev.client === this.roomCreator) {
-            const connectionUser = await this.accountService.getConnectionUser(ev.client);
+        if (ev.client === this.roomCreator && this.authApi) {
+            const connectionUser = await this.authApi.getConnectionUser(ev.client);
             if (connectionUser) {
-                const gameSettings: any = {};
-                for (const [ gameOptionPath, gameOptionValue ] of this.gameOptions.cachedValues) {
-                    gameSettings[gameOptionPath] = gameOptionValue.toJSON();
-                }
-                await this.accountService.updateUserSettings(connectionUser.client_id, gameSettings);
+                await this.updateUserSettings(connectionUser.client_id);
             }
         }
     }
@@ -311,7 +320,6 @@ export class MouthwashApiPlugin extends RoomPlugin {
             return;
 
         this.cameraControllers.despawnCamera(ev.player);
-        this.buttonService.despawnAllButtons(ev.player);
     }
 
     @EventListener("player.checkname")
@@ -333,30 +341,32 @@ export class MouthwashApiPlugin extends RoomPlugin {
             this.roomCreator = connection;
 
         if (ev.player.isHost) {
-            const connectionUser = await this.accountService.getConnectionUser(connection);
-
-            if (connectionUser) {
-                const keys = Object.keys(connectionUser.game_settings);
-                for (let i = 0; i < keys.length; i++) {
-                    const gameOptionPath = keys[i];
-                    const gameOptionValue = connectionUser.game_settings[gameOptionPath];
-
-                    if (gameOptionValue.type === "enum") {
-                        const gameOption = new EnumValue<string>(gameOptionValue.options, gameOptionValue.selectedIdx);
-                        this.gameOptions.cachedValues.set(gameOptionPath, gameOption);
-                    } else if (gameOptionValue.type === "boolean") {
-                        const gameOption = new BooleanValue(gameOptionValue.enabled);
-                        this.gameOptions.cachedValues.set(gameOptionPath, gameOption);
-                    } else if (gameOptionValue.type === "number") {
-                        const gameOption = new NumberValue(
-                            gameOptionValue.value,
-                            gameOptionValue.step,
-                            gameOptionValue.lower,
-                            gameOptionValue.upper,
-                            gameOptionValue.zeroIsInfinity,
-                            gameOptionValue.suffix,
-                        );
-                        this.gameOptions.cachedValues.set(gameOptionPath, gameOption);
+            if (this.authApi) {
+                const connectionUser = await this.authApi.getConnectionUser(connection);
+    
+                if (connectionUser) {
+                    const keys = Object.keys(connectionUser.game_settings);
+                    for (let i = 0; i < keys.length; i++) {
+                        const gameOptionPath = keys[i];
+                        const gameOptionValue = connectionUser.game_settings[gameOptionPath];
+    
+                        if (gameOptionValue.type === "enum") {
+                            const gameOption = new EnumValue<string>(gameOptionValue.options, gameOptionValue.selectedIdx);
+                            this.gameOptions.cachedValues.set(gameOptionPath, gameOption);
+                        } else if (gameOptionValue.type === "boolean") {
+                            const gameOption = new BooleanValue(gameOptionValue.enabled);
+                            this.gameOptions.cachedValues.set(gameOptionPath, gameOption);
+                        } else if (gameOptionValue.type === "number") {
+                            const gameOption = new NumberValue(
+                                gameOptionValue.value,
+                                gameOptionValue.step,
+                                gameOptionValue.lower,
+                                gameOptionValue.upper,
+                                gameOptionValue.zeroIsInfinity,
+                                gameOptionValue.suffix,
+                            );
+                            this.gameOptions.cachedValues.set(gameOptionPath, gameOption);
+                        }
                     }
                 }
             }
@@ -477,6 +487,13 @@ export class MouthwashApiPlugin extends RoomPlugin {
     @EventListener("room.gamestart")
     async onGameStart(ev: RoomGameStartEvent) {
         this.updateDefaultSettings();
+        
+        if (this.authApi && this.roomCreator && !this.roomCreator.sentDisconnect) {
+            const connectionUser = await this.authApi.getConnectionUser(this.roomCreator);
+            if (connectionUser) {
+                await this.updateUserSettings(connectionUser.client_id);
+            }
+        }
 
         if (this.gamemode) {
             const promises = [];
@@ -495,165 +512,159 @@ export class MouthwashApiPlugin extends RoomPlugin {
         });
     }
 
-    @EventListener("room.endgameintent")
-    onEndGameIntent(ev: RoomEndGameIntentEvent<Room>) {
-        if (!ev.metadata.endGameScreen) {
-            ev.cancel();
-            
-            const players: PlayerInfo<Room>[] = [];
-            if (this.room.gameData) {
-                for (const [ , player ] of this.room.gameData.players) {
-                    if (player.playerId !== undefined) {
-                        players.push(player);
-                    }
+    getEndgamePlayers() {
+        const players: PlayerInfo<Room>[] = [];
+        if (this.room.gameData) {
+            for (const [ , player ] of this.room.gameData.players) {
+                if (player.playerId !== undefined) {
+                    players.push(player);
                 }
             }
+        }
+        return players;
+    }
 
-            if (ev.intentName === AmongUsEndGames.O2Sabotage || ev.intentName === AmongUsEndGames.ReactorSabotage) {
+    @EventListener("room.endgameintent")
+    onEndGameIntent(ev: RoomEndGameIntentEvent<Room>) {
+        if (ev.metadata.endGameScreen)
+            return;
+
+        ev.cancel();
+
+        if (ev.intentName === AmongUsEndGames.TasksComplete)
+            return; // task completes are handled separately below
+
+        const players = this.getEndgamePlayers();
+
+        if (ev.intentName === AmongUsEndGames.O2Sabotage || ev.intentName === AmongUsEndGames.ReactorSabotage) {
+            this.room.registerEndGameIntent(
+                new EndGameIntent(
+                    MouthwashEndGames.SystemSabotage,
+                    GameOverReason.ImpostorBySabotage,
+                    {
+                        endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
+                            return [
+                                player.playerId,
+                                {
+                                    titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
+                                    subtitleText: `${Palette.impostorRed.text("Impostors")} won by sabotage`,
+                                    backgroundColor: Palette.impostorRed,
+                                    yourTeam: RoleAlignment.Impostor,
+                                    winSound: WinSound.ImpostorWin,
+                                    hasWon: player.isImpostor
+                                }
+                            ];
+                        }))
+                    }
+                )
+            );
+        } else if (ev.intentName === AmongUsEndGames.PlayersDisconnect) {
+            const metadata = ev.metadata as PlayersDisconnectEndgameMetadata;
+            if (metadata.aliveImpostors === 0) {
                 this.room.registerEndGameIntent(
                     new EndGameIntent(
-                        MouthwashEndGames.SystemSabotage,
-                        GameOverReason.ImpostorBySabotage,
-                        {
-                            endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
-                                return [
-                                    player.playerId,
-                                    {
-                                        titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                        subtitleText: `${Palette.impostorRed.text("Impostors")} won by sabotage`,
-                                        backgroundColor: Palette.impostorRed,
-                                        winSound: WinSound.ImpostorWin,
-                                        hasWon: player.isImpostor
-                                    }
-                                ];
-                            }))
-                        }
-                    )
-                );
-            } else if (ev.intentName === AmongUsEndGames.PlayersDisconnect) {
-                const metadata = ev.metadata as PlayersDisconnectEndgameMetadata;
-                if (metadata.aliveImpostors === 0) {
-                    this.room.registerEndGameIntent(
-                        new EndGameIntent(
-                            MouthwashEndGames.ImpostorsDisconnected,
-                            GameOverReason.ImpostorDisconnect,
-                            {
-                                endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
-                                    return [
-                                        player.playerId,
-                                        {
-                                            titleText: !player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                            subtitleText: `All ${Palette.impostorRed.text("Impostors")} disconnected`,
-                                            backgroundColor: Palette.crewmateBlue,
-                                            winSound: WinSound.CrewmateWin,
-                                            hasWon: !player.isImpostor
-                                        }
-                                    ];
-                                }))
-                            }
-                        )
-                    );
-                } else {
-                    this.room.registerEndGameIntent(
-                        new EndGameIntent(
-                            MouthwashEndGames.CrewmatesDisconnected,
-                            GameOverReason.HumansDisconnect,
-                            {
-                                endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
-                                    return [
-                                        player.playerId,
-                                        {
-                                            titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                            subtitleText: `${Palette.crewmateBlue.text("Crewmates")} disconnected`,
-                                            backgroundColor: Palette.impostorRed,
-                                            winSound: WinSound.ImpostorWin,
-                                            hasWon: player.isImpostor
-                                        }
-                                    ];
-                                }))
-                            }
-                        )
-                    );
-                }
-            } else if (ev.intentName === AmongUsEndGames.PlayersKill) {
-                this.room.registerEndGameIntent(
-                    new EndGameIntent(
-                        MouthwashEndGames.ImpostorsKilledCrewmates,
-                        GameOverReason.ImpostorByKill,
-                        {
-                            endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
-                                return [
-                                    player.playerId,
-                                    {
-                                        titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                        subtitleText: `The ${Palette.impostorRed.text("Impostors")} killed all of the ${Palette.crewmateBlue.text("Crewmates")}`,
-                                        backgroundColor: Palette.impostorRed,
-                                        winSound: WinSound.ImpostorWin,
-                                        hasWon: player.isImpostor
-                                    }
-                                ];
-                            }))
-                        }
-                    )
-                );
-            } else if (ev.intentName === AmongUsEndGames.PlayersVoteOut) {
-                const metadata = ev.metadata as PlayersVoteOutEndgameMetadata;
-                if (metadata.exiled.info?.isImpostor) {
-                    this.room.registerEndGameIntent(
-                        new EndGameIntent(
-                            MouthwashEndGames.CrewmateVotedOut,
-                            GameOverReason.ImpostorByVote,
-                            {
-                                endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
-                                    return [
-                                        player.playerId,
-                                        {
-                                            titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                            subtitleText: `The ${Palette.impostorRed.text("Impostors")} voted out the last ${Palette.crewmateBlue.text("Crewmate")}`,
-                                            backgroundColor: Palette.impostorRed,
-                                            winSound: WinSound.ImpostorWin,
-                                            hasWon: player.isImpostor
-                                        }
-                                    ];
-                                }))
-                            }
-                        )
-                    );
-                } else {
-                    this.room.registerEndGameIntent(
-                        new EndGameIntent(
-                            MouthwashEndGames.ImpostorVotedOut,
-                            GameOverReason.HumansByVote,
-                            {
-                                endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
-                                    return [
-                                        player.playerId,
-                                        {
-                                            titleText: !player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                            subtitleText: `The ${Palette.crewmateBlue.text("Crewmates")} voted out all of the ${Palette.impostorRed.text("Impostors")}`,
-                                            backgroundColor: Palette.crewmateBlue,
-                                            winSound: WinSound.CrewmateWin,
-                                            hasWon: !player.isImpostor
-                                        }
-                                    ];
-                                }))
-                            }
-                        )
-                    );
-                }
-            } else if (ev.intentName === AmongUsEndGames.TasksComplete) {
-                this.room.registerEndGameIntent(
-                    new EndGameIntent(
-                        MouthwashEndGames.CrewmatesCompletedTasks,
-                        GameOverReason.HumansByTask,
+                        MouthwashEndGames.ImpostorsDisconnected,
+                        GameOverReason.ImpostorDisconnect,
                         {
                             endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
                                 return [
                                     player.playerId,
                                     {
                                         titleText: !player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
-                                        subtitleText: `The ${Palette.crewmateBlue.text("Crewmates")} completed all of the tasks`,
+                                        subtitleText: `${Palette.impostorRed.text("Impostors")} disconnected`,
                                         backgroundColor: Palette.crewmateBlue,
+                                        yourTeam: RoleAlignment.Crewmate,
+                                        winSound: WinSound.CrewmateWin,
+                                        hasWon: !player.isImpostor
+                                    }
+                                ];
+                            }))
+                        }
+                    )
+                );
+            } else {
+                this.room.registerEndGameIntent(
+                    new EndGameIntent(
+                        MouthwashEndGames.CrewmatesDisconnected,
+                        GameOverReason.HumansDisconnect,
+                        {
+                            endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
+                                return [
+                                    player.playerId,
+                                    {
+                                        titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
+                                        subtitleText: `${Palette.crewmateBlue.text("Crewmates")} disconnected`,
+                                        backgroundColor: Palette.impostorRed,
+                                        yourTeam: RoleAlignment.Impostor,
+                                        winSound: WinSound.ImpostorWin,
+                                        hasWon: player.isImpostor
+                                    }
+                                ];
+                            }))
+                        }
+                    )
+                );
+            }
+        } else if (ev.intentName === AmongUsEndGames.PlayersKill) {
+            this.room.registerEndGameIntent(
+                new EndGameIntent(
+                    MouthwashEndGames.ImpostorsKilledCrewmates,
+                    GameOverReason.ImpostorByKill,
+                    {
+                        endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
+                            return [
+                                player.playerId,
+                                {
+                                    titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
+                                    subtitleText: `The ${Palette.impostorRed.text("Impostors")} killed all of the ${Palette.crewmateBlue.text("Crewmates")}`,
+                                    backgroundColor: Palette.impostorRed,
+                                    yourTeam: RoleAlignment.Impostor,
+                                    winSound: WinSound.ImpostorWin,
+                                    hasWon: player.isImpostor
+                                }
+                            ];
+                        }))
+                    }
+                )
+            );
+        } else if (ev.intentName === AmongUsEndGames.PlayersVoteOut) {
+            const metadata = ev.metadata as PlayersVoteOutEndgameMetadata;
+            if (metadata.exiled.info?.isImpostor) {
+                this.room.registerEndGameIntent(
+                    new EndGameIntent(
+                        MouthwashEndGames.CrewmateVotedOut,
+                        GameOverReason.ImpostorByVote,
+                        {
+                            endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
+                                return [
+                                    player.playerId,
+                                    {
+                                        titleText: player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
+                                        subtitleText: `The ${Palette.impostorRed.text("Impostors")} voted out the last ${Palette.crewmateBlue.text("Crewmate")}`,
+                                        backgroundColor: Palette.impostorRed,
+                                        yourTeam: RoleAlignment.Impostor,
+                                        winSound: WinSound.ImpostorWin,
+                                        hasWon: player.isImpostor
+                                    }
+                                ];
+                            }))
+                        }
+                    )
+                );
+            } else {
+                this.room.registerEndGameIntent(
+                    new EndGameIntent(
+                        MouthwashEndGames.ImpostorVotedOut,
+                        GameOverReason.HumansByVote,
+                        {
+                            endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
+                                return [
+                                    player.playerId,
+                                    {
+                                        titleText: !player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
+                                        subtitleText: `The ${Palette.crewmateBlue.text("Crewmates")} voted out the last ${Palette.impostorRed.text("Impostor")}`,
+                                        backgroundColor: Palette.crewmateBlue,
+                                        yourTeam: RoleAlignment.Crewmate,
                                         winSound: WinSound.CrewmateWin,
                                         hasWon: !player.isImpostor
                                     }
@@ -679,7 +690,8 @@ export class MouthwashApiPlugin extends RoomPlugin {
         const rolePlayers: Record<RoleAlignment, number[]> = {
             [RoleAlignment.Crewmate]: [],
             [RoleAlignment.Neutral]: [],
-            [RoleAlignment.Impostor]: []
+            [RoleAlignment.Impostor]: [],
+            [RoleAlignment.All]: []
         }
 
         for (const [ , player ] of this.room.players) {
@@ -727,6 +739,12 @@ export class MouthwashApiPlugin extends RoomPlugin {
                             return acc;
                         }, []);
 
+            const customWinSoundAsset = typeof endGame.winSound === "number"
+                ? undefined
+                : endGame.winSound instanceof AssetReference
+                    ? await this.assetLoader.resolveAssetReference(endGame.winSound)
+                    : endGame.winSound;
+
             promises.push(
                 connection.sendPacket(
                     new ReliablePacket(
@@ -739,12 +757,12 @@ export class MouthwashApiPlugin extends RoomPlugin {
                                 yourTeam || [],
                                 true,
                                 true,
-                                typeof endGame.winSound === "number"
-                                    ? endGame.winSound
-                                    : WinSound.CustomSound,
-                                typeof endGame.winSound === "number"
-                                    ? 0
-                                    : endGame.winSound.assetId
+                                customWinSoundAsset !== undefined
+                                    ? WinSound.CustomSound
+                                    : customWinSoundAsset || WinSound.NoSound,
+                                customWinSoundAsset
+                                    ? customWinSoundAsset.assetId
+                                    : 0
                             )
                         ]
                     )
@@ -758,6 +776,59 @@ export class MouthwashApiPlugin extends RoomPlugin {
             this.nameService.resetAllNames(),
             this.roleService.removeAllRoles()
         ]);
+    }
+    
+    @EventListener("player.completetask")
+    async onPlayerCompleteTask(ev: PlayerCompleteTaskEvent<Room>) {
+        let totalTasks = 0;
+        let completeTasks = 0;
+        const taskStates: Map<number, FinalTaskState[]> = new Map;
+        for (const [ , player ] of this.room.players) {
+            const playerInfo = player.info;
+            if (playerInfo && !playerInfo.isDisconnected && this.hudService.getPlayerHud(player).allowTaskInteraction) {
+                const states: FinalTaskState[] = [];
+                taskStates.set(playerInfo.playerId, states);
+                for (const task of playerInfo.taskStates) {
+                    totalTasks++;
+                    if (task.completed) {
+                        completeTasks++;
+                    }
+                    states.push({
+                        taskId: playerInfo.taskIds[task.taskidx],
+                        completed: task.completed
+                    });
+                }
+            }
+        }
+
+        if (totalTasks > 0 && completeTasks >= totalTasks) {
+            const players = this.getEndgamePlayers();
+            this.room.registerEndGameIntent(
+                new EndGameIntent(
+                    MouthwashEndGames.CrewmatesCompletedTasks,
+                    GameOverReason.HumansByTask,
+                    {
+                        endGameScreen: new Map(players.map<[number, EndGameScreen]>(player => {
+                            return [
+                                player.playerId,
+                                {
+                                    titleText: !player.isImpostor ? "Victory" : Palette.impostorRed.text("Defeat"),
+                                    subtitleText: `The ${Palette.crewmateBlue.text("Crewmates")} completed all of the tasks`,
+                                    backgroundColor: Palette.crewmateBlue,
+                                    winSound: WinSound.CrewmateWin,
+                                    hasWon: !player.isImpostor
+                                }
+                            ];
+                        }))
+                    }
+                )
+            );
+        }
+    }
+
+    @EventListener("player.murder")
+    async onPlayerMurder(ev: PlayerMurderEvent<Room>) {
+        await this.deadBodyService.spawnDeadBody(ev.player);
     }
 
     @EventListener("player.die")
@@ -779,5 +850,14 @@ export class MouthwashApiPlugin extends RoomPlugin {
         }
 
         this.hudService.updateHudString(HudLocation.TaskText, ev.player, playerHud);
+    }
+
+    @EventListener("player.startmeeting")
+    async onStartMeeting(ev: PlayerStartMeetingEvent<Room>) {
+        const promises = [];
+        for (const [ , deadBody ] of this.deadBodyService.deadBodies) {
+            promises.push(deadBody.destroy("meeting"));
+        }
+        await Promise.all(promises);
     }
 }

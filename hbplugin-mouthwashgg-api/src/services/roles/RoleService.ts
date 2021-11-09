@@ -79,7 +79,10 @@ export class RoleService {
         
         shuffleArray(players);
         
-        const impostorCount = RoleService.adjustImpostorCount(this.plugin.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorCount)?.getValue<NumberValue>().value || 0);
+        const impostorCount = Math.min(
+            this.plugin.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorCount)?.getValue<NumberValue>().value || 2,
+            RoleService.adjustImpostorCount(this.plugin.room.players.size)
+        );
 
         this.plugin.room.setSettings({
             numImpostors: impostorCount
@@ -105,8 +108,14 @@ export class RoleService {
     }
 
     async assignAllRoles(roleAssignments: RoleAssignment[]) {
-        const impostorCount = roleAssignments.reduce((acc, rol) => rol.role.metadata.alignment === RoleAlignment.Impostor ? acc + 1 : acc, 0);
-
+        const allPlayers = [];
+        let impostorCount = 0;
+        for (const assignment of roleAssignments) {
+            allPlayers.push(assignment.player);
+            if (assignment.role.metadata.alignment === RoleAlignment.Impostor) {
+                impostorCount++;
+            }
+        }
         const assignPromises = [];
 
         for (const roleAssignment of roleAssignments) {
@@ -114,7 +123,8 @@ export class RoleService {
                 roleAssignment.player,
                 roleAssignment.role,
                 roleAssignments,
-                impostorCount
+                impostorCount,
+                allPlayers
             ));
         }
 
@@ -130,7 +140,7 @@ export class RoleService {
             this.plugin.hudService.setHudStringFor(
                 HudLocation.TaskText,
                 RoleStringNames.TaskObjective,
-                role.getHudText(),
+                role.metadata.themeColor.text("Role: " + role.metadata.roleName + "\n" + role.metadata.roleObjective),
                 Priority.A,
                 [ role.player ]
             );
@@ -140,18 +150,22 @@ export class RoleService {
         await Promise.all(readyPromises);
     }
     
-    async sendStartGameScreen(player: PlayerData, startGameScreen: StartGameScreen) {
+    async sendStartGameScreen(player: PlayerData, startGameScreen: StartGameScreen, allPlayers: PlayerData[]) {
         const connection = this.plugin.room.connections.get(player.clientId);
         if (connection) {
-            const teamPlayers = Array.isArray(startGameScreen.teamPlayers)
+            let teamPlayers = Array.isArray(startGameScreen.teamPlayers)
                 ? startGameScreen.teamPlayers
-                : [];
+                : startGameScreen.teamPlayers === RoleAlignment.All
+                    ? allPlayers
+                    : [];
 
             if (!Array.isArray(startGameScreen.teamPlayers)) {
-                for (const [ , player ] of this.plugin.room.players) {
-                    const playerRole = this.playerRoles.get(player);
-                    if (playerRole && playerRole.metadata.alignment === startGameScreen.teamPlayers) {
-                        teamPlayers.push(player);
+                if (startGameScreen.teamPlayers !== RoleAlignment.All) {
+                    for (const [ , player ] of this.plugin.room.players) {
+                        const playerRole = this.playerRoles.get(player);
+                        if (playerRole && playerRole.metadata.alignment === startGameScreen.teamPlayers) {
+                            teamPlayers.push(player);
+                        }
                     }
                 }
             }
@@ -181,19 +195,19 @@ export class RoleService {
         }
     }
 
-    async assignRoleInitial<T extends RoleCtr<K>, K extends BaseRole>(player: PlayerData<Room>, role: T, roleAssignments: RoleAssignment[], impostorCount: number): Promise<K> {
-        const roleInstance = this.assignRole(player, role) as K;
+    async assignRoleInitial<T extends RoleCtr<K>, K extends BaseRole>(player: PlayerData<Room>, role: T, roleAssignments: RoleAssignment[], impostorCount: number, allPlayers: PlayerData[]): Promise<K> {
+        const roleInstance = await this.assignRole(player, role) as K;
 
         const startGameScreen = roleInstance.getStartGameScreen(roleAssignments, impostorCount);
-        await this.sendStartGameScreen(player, startGameScreen);
+        await this.sendStartGameScreen(player, startGameScreen, allPlayers);
 
         return roleInstance;
     }
 
-    assignRole<T extends RoleCtr<K>, K extends BaseRole>(player: PlayerData<Room>, role: T): K {
+    async assignRole<T extends RoleCtr<K>, K extends BaseRole>(player: PlayerData<Room>, role: T): Promise<K> {
         const cachedRole = this.playerRoles.get(player);
         if (cachedRole) {
-            this.removeRole(cachedRole);
+            await this._removeRole(cachedRole);
         }
 
         const roleInstance = new role(player);
@@ -217,16 +231,16 @@ export class RoleService {
         return roleInstance;
     }
 
-    removeAllRoles() {
+    async removeAllRoles() {
+        const promises = [];
         for (const [ , player ] of this.plugin.room.players) {
-            const playerRole = this.getPlayerRole(player);
-            if (playerRole) {
-                this.removeRole(playerRole);
-            }
+            promises.push(this.removeRole(player));
         }
+        await Promise.all(promises);
     }
 
-    removeRole(role: BaseRole) {
+    private async _removeRole(role: BaseRole) {
+        await role.onRemove();
         for (const event of role.registeredEventListeners) {
             if (event.type === ListenerType.Room) {
                 this.plugin.room.off(event.eventName, event.handler);
@@ -235,5 +249,13 @@ export class RoleService {
             }
         }
         this.playerRoles.delete(role.player);
+        this.plugin.nameService.removeEmoji
+    }
+
+    async removeRole(player: PlayerData) {
+        const playerRole = this.getPlayerRole(player);
+        if (playerRole) {
+            await this._removeRole(playerRole);
+        }
     }
 }

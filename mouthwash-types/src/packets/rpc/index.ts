@@ -4,5 +4,5 @@ export * from "./BeginPlayerAnimation";
 export * from "./Click";
 export * from "./CloseHud";
 export * from "./SetChatVisibility";
-export * from "./SetPlayerOpacity";
-export * from "./SetPlayerOutline";
+export * from "./SetOpacity";
+export * from "./SetOutline";

@@ -1,5 +1,6 @@
 export enum RoleAlignment {
     Crewmate,
     Neutral,
-    Impostor
+    Impostor,
+    All
 }

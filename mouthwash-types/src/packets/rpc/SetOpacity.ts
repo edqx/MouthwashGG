@@ -1,7 +1,7 @@
 import { BaseRpcMessage, HazelReader, HazelWriter } from "@skeldjs/hindenburg";
 import { MouthwashRpcMessageTag } from "../../enums";
 
-export class SetPlayerOpacityMessage extends BaseRpcMessage {
+export class SetOpacityMessage extends BaseRpcMessage {
     static messageTag = MouthwashRpcMessageTag.SetOpacity as const;
     messageTag = MouthwashRpcMessageTag.SetOpacity as const;
 
@@ -13,7 +13,7 @@ export class SetPlayerOpacityMessage extends BaseRpcMessage {
 
     static Deserialize(reader: HazelReader) {
         const opacity = reader.uint8();
-        return new SetPlayerOpacityMessage(opacity);
+        return new SetOpacityMessage(opacity);
     }
 
     Serialize(writer: HazelWriter) {

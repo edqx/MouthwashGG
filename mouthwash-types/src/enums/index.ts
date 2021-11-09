@@ -1,5 +1,6 @@
 export * from "./AssetType";
 export * from "./AudioType";
+export * from "./BodyDirection";
 export * from "./ChatMessageAlignment";
 export * from "./EdgeAlignment";
 export * from "./GameOptionType";

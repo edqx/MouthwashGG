@@ -32,7 +32,7 @@ INTERNAL_ACCESS_KEY=""
 
     const [ hostName, port ] = process.env.POSTGRES_HOST.split(":");
     
-    const a = new AccountServer({
+    const accountServer = new AccountServer({
         postgres: {
             host: hostName,
             port: parseInt(port),
@@ -44,6 +44,7 @@ INTERNAL_ACCESS_KEY=""
     });
     
     (async () => {
-        await a.start();
+        await accountServer.start();
+        console.log("Listening on port *:" + accountServer.config.port);
     })();
 })();

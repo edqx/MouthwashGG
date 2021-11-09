@@ -10,7 +10,8 @@ import {
     PacketContext,
     RegisterPrefab,
     Networkable,
-    SendOption
+    SendOption,
+    SpawnType
 } from "@skeldjs/hindenburg";
 
 import {
@@ -21,6 +22,7 @@ import {
     ClickMessage,
     CloseHudMessage,
     CustomNetworkTransformGeneric,
+    DeadBody,
     DeleteChatMessageMessage,
     DeleteGameOptionMessage,
     DisplayStartGameScreenMessage,
@@ -28,6 +30,7 @@ import {
     FetchResourceMessage,
     Graphic,
     ModstampSetStringMessage,
+    MouthwashMeetingHud,
     MouthwashSpawnType,
     OverwriteGameOver,
     PingPacket,
@@ -36,14 +39,15 @@ import {
     SetGameOptionMessage,
     SetHudStringMessage,
     SetHudVisibility,
-    SetPlayerOpacityMessage,
-    SetPlayerOutlineMessage,
+    SetOpacityMessage,
+    SetOutlineMessage,
     SetQrContentsMessage,
     SoundSource
 } from "mouthwash-types";
 
+import { MouthwashAuthPlugin } from "hbplugin-mouthwashgg-auth";
+
 import { MouthwashApiPlugin, ClientFetchResourceResponseEvent } from "hbplugin-mouthwashgg-api";
-import { AccountService } from "./services";
 
 @HindenburgPlugin("hbplugin-mouthwashgg", "1.0.0", "none")
 @RegisterMessage(BeginCameraAnimationMessage)
@@ -63,22 +67,22 @@ import { AccountService } from "./services";
 @RegisterMessage(SetGameOptionMessage)
 @RegisterMessage(SetHudStringMessage)
 @RegisterMessage(SetHudVisibility)
-@RegisterMessage(SetPlayerOutlineMessage)
-@RegisterMessage(SetPlayerOpacityMessage)
+@RegisterMessage(SetOutlineMessage)
+@RegisterMessage(SetOpacityMessage)
 @RegisterMessage(SetQrContentsMessage)
+@RegisterPrefab(SpawnType.MeetingHud, [ MouthwashMeetingHud ])
 @RegisterPrefab(MouthwashSpawnType.Button, [ CustomNetworkTransformGeneric, Graphic, ClickBehaviour ] as typeof Networkable[])
+@RegisterPrefab(MouthwashSpawnType.DeadBody, [ DeadBody, CustomNetworkTransformGeneric ] as typeof Networkable[])
 @RegisterPrefab(MouthwashSpawnType.SoundSource, [ SoundSource, CustomNetworkTransformGeneric ] as typeof Networkable[])
 @RegisterPrefab(MouthwashSpawnType.CameraController, [ CameraController ] as typeof Networkable[])
 export class MouthwashPlugin extends WorkerPlugin {
-    accountService: AccountService;
+    private _authApi?: MouthwashAuthPlugin;
 
     constructor(
         public readonly worker: Worker,
         public readonly config: any
     ) {
         super(worker, config);
-
-        this.accountService = new AccountService(this);
 
         this.worker.socket.removeAllListeners();
         this.worker.socket.on("message", this.handlePossiblySignedMessage.bind(this));
@@ -109,9 +113,25 @@ export class MouthwashPlugin extends WorkerPlugin {
         }, 2000);
     }
 
+    get authApi() {
+        this._authApi ??= this.worker.loadedPlugins.get("hbplugin-mouthwashgg-auth") as MouthwashAuthPlugin;
+        return this._authApi;
+    }
+
     async handlePossiblySignedMessage(message: Buffer, rinfo: dgram.RemoteInfo) {
+        if (!this.authApi) {
+            if (message[0] === 0x80) {
+                return this.worker.handleMessage(message.slice(37), rinfo);
+            }
+            return this.worker.handleMessage(message, rinfo);
+        }
+
         if (message[0] === SendOption.Acknowledge) {
             return this.worker.handleMessage(message, rinfo);
+        }
+
+        if (message[0] !== 0x80) {
+            return this.logger.warn("%s:%s sent unauthenticated message", rinfo.address + ":" + rinfo.port);;
         }
 
         if (message[0] === 0x80) {
@@ -122,13 +142,13 @@ export class MouthwashPlugin extends WorkerPlugin {
                 + message.slice(11, 17).toString("hex");
 
             const connection = this.worker.connections.get(rinfo.address + ":" + rinfo.port);
-            const cachedSession = connection && this.accountService.connectionSessions.get(connection);
+            const cachedSession = connection && this.authApi.connectionSessionCache.get(connection);
 
-            const sessionInfo = (connection && cachedSession) || await this.accountService.getSession(uuid, rinfo.address);
+            const sessionInfo = (connection && cachedSession) || await this.authApi.getSession(uuid, rinfo.address);
 
             if (sessionInfo) {
                 if (connection && !cachedSession) {
-                    this.accountService.connectionSessions.set(connection, sessionInfo);
+                    this.authApi.connectionSessionCache.set(connection, sessionInfo);
                 }
 
                 const hmacHash = message.slice(17, 37);
@@ -138,8 +158,6 @@ export class MouthwashPlugin extends WorkerPlugin {
                 }
             }
         }
-
-        this.logger.warn("%s:%s sent unauthenticated message", rinfo.address + ":" + rinfo.port);
     }
 
     @MessageHandler(SetGameOptionMessage)

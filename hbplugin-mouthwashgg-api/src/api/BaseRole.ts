@@ -1,9 +1,10 @@
 import { PlayerData, Room, Vector2 } from "@skeldjs/hindenburg";
-import { AnyGameOptionType, EdgeAlignment, GameOption, Palette } from "mouthwash-types";
+import { AnyGameOptionType, EdgeAlignment, GameOption, HudLocation, Palette, Priority } from "mouthwash-types";
 import { AssetBundle, AssetReference, ButtonSpawnInfo, RoleAssignment } from "../services";
 import { MouthwashApiPlugin } from "../plugin";
 import { RoleMetadata, StartGameScreen } from "./interfaces";
 import { RoleRegisteredEventListenerInfo } from "./hooks";
+import { RoleAlignment } from ".";
 
 export class RoleGameOption {
     constructor(
@@ -41,9 +42,10 @@ export class BaseRole {
     }
 
     async onReady() {}
+    async onRemove() {}
 
     async spawnButton(buttonId: string, assetRef: AssetReference, buttonInfo: Partial<ButtonSpawnInfo>) {
-        const playerButtons = this.api.buttonService.getPlayerButtons(this.player);
+        const playerButtons = this.api.hudService.getPlayerHud(this.player).buttons;
 
         const cachedButton = playerButtons.get(buttonId);
         if (cachedButton) {
@@ -53,17 +55,10 @@ export class BaseRole {
         const row = playerButtons.size % 2;
         const column = Math.floor(playerButtons.size / 2);
 
-        const assetBundle = await AssetBundle.loadFromUrl(assetRef.bundleLocation, false);
-        const asset = assetBundle.getAssetSafe(assetRef.assetPath);
+        const asset = await this.api.assetLoader.resolveAssetReferenceFor(assetRef, [ this.player ]);
 
-        const connection = this.room.connections.get(this.player.clientId);
-        if (connection) {
-            await this.api.assetLoader.assertLoaded(
-                connection,
-                assetBundle
-            );
-            await this.api.assetLoader.waitForLoaded(connection, assetBundle);
-        }
+        if (!asset)
+            return undefined;
 
         const spawnInfo: ButtonSpawnInfo = {
             position: baseButtonPosition
@@ -84,11 +79,18 @@ export class BaseRole {
             ...buttonInfo
         };
 
-        return await this.api.buttonService.spawnButton(
+        return await this.api.hudService.spawnButton(
             this.player,
             buttonId,
             spawnInfo
         );
+    }
+
+    async giveFakeTasks() {
+        await Promise.all([
+            this.api.hudService.setTaskInteraction(this.player, false),
+            this.api.hudService.setHudStringFor(HudLocation.TaskText, "fake-tasks", Palette.impostorRed.text("Fake tasks:"), Priority.Z, [ this.player ])
+        ]);
     }
 
     getTeamPlayers() {
@@ -107,12 +109,10 @@ export class BaseRole {
             titleText: this.metadata.roleName,
             subtitleText: this.metadata.roleObjective,
             backgroundColor: this.metadata.themeColor,
-            teamPlayers: this.getTeamPlayers()
+            teamPlayers: this.metadata.alignment === RoleAlignment.Impostor
+                ? RoleAlignment.Impostor
+                : RoleAlignment.All
         };
-    }
-
-    getHudText() {
-        return this.metadata.themeColor.text("Role: " + this.metadata.roleName + "\n" + this.metadata.roleObjective);
     }
 }
 

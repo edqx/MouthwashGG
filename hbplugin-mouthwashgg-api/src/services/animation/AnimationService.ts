@@ -4,18 +4,16 @@ import {
     BeginPlayerAnimationMessage,
     CameraAnimationKeyframe,
     PlayerAnimationKeyframe,
-    SetPlayerOpacityMessage,
-    SetPlayerOutlineMessage,
+    SetOpacityMessage,
+    SetOutlineMessage,
     RGBA,
-    PlayerAnimationKeyframeData
+    DeadBody
 } from "mouthwash-types";
 
 import { MouthwashApiPlugin } from "../../plugin";
 
 export class AnimationService {
-    constructor(
-        public readonly plugin: MouthwashApiPlugin
-    ) {}
+    constructor(public readonly plugin: MouthwashApiPlugin) {}
 
     async beginCameraAnimation(
         player: PlayerData,
@@ -41,7 +39,7 @@ export class AnimationService {
         if (!playerControl)
             throw new Error("Player has no player control");
 
-        const connections = this.plugin.getConnections(sendTo);
+        const connections = this.plugin.room.getConnections(sendTo);
 
         await this.plugin.room.broadcastMessages([
             new RpcMessage(
@@ -75,17 +73,17 @@ export class AnimationService {
     }
 
     private async _setOutline(player: PlayerData<Room>, enabled: boolean, color: RGBA, sendTo?: PlayerData[]) {
-        const playerControl = player.control;
+        const component = player.control;
 
-        if (!playerControl)
+        if (!component)
             return;
             
-        const connections = this.plugin.getConnections(sendTo);
+        const connections = this.plugin.room.getConnections(sendTo);
 
         await this.plugin.room.broadcastMessages([
             new RpcMessage(
-                playerControl.netId,
-                new SetPlayerOutlineMessage(
+                component.netId,
+                new SetOutlineMessage(
                     enabled,
                     color
                 )
@@ -93,10 +91,7 @@ export class AnimationService {
         ], undefined, connections);
     }
 
-    async setOutline(
-        player: PlayerData<Room>,
-        color: RGBA
-    ) {
+    async setOutline(player: PlayerData<Room>, color: RGBA) {
         await this._setOutline(player, true, color);
     }
 
@@ -119,17 +114,17 @@ export class AnimationService {
     }
 
     private async _setOpacity(player: PlayerData<Room>, opacity: number, sendTo?: PlayerData[]) {
-        const playerControl = player.control;
+        const component = player.control;
 
-        if (!playerControl)
-            throw new Error("Player has no player control");
+        if (!component)
+            return;
 
-        const connections = this.plugin.getConnections(sendTo);
+        const connections = this.plugin.room.getConnections(sendTo);
             
         await this.plugin.room.broadcastMessages([
             new RpcMessage(
-                playerControl.netId,
-                new SetPlayerOpacityMessage(opacity)
+                component.netId,
+                new SetOpacityMessage(opacity)
             )
         ], undefined, connections);
     }

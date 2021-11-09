@@ -48,7 +48,7 @@ export const DefaultRoomOptionName = {
 } as const;
 
 export type AnyMap = "The Skeld"|"Polus"|"Mira HQ"|"Airship"|"Submerged";
-export type AnyImpostorKillDistance = "Short"|"Medium"|"Long";
+export type AnyKillDistance = "Really Short"|"Short"|"Medium"|"Long";
 export type AnyTaskbarUpdate = "Always"|"Meetings"|"Never";
 
 export class GameOptionsService {

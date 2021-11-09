@@ -2,7 +2,7 @@ import { BaseRpcMessage, HazelReader, HazelWriter } from "@skeldjs/hindenburg";
 import { RGBA } from "../../misc";
 import { MouthwashRpcMessageTag } from "../../enums";
 
-export class SetPlayerOutlineMessage extends BaseRpcMessage {
+export class SetOutlineMessage extends BaseRpcMessage {
     static messageTag = MouthwashRpcMessageTag.SetOutline as const;
     messageTag = MouthwashRpcMessageTag.SetOutline as const;
 
@@ -16,7 +16,7 @@ export class SetPlayerOutlineMessage extends BaseRpcMessage {
     static Deserialize(reader: HazelReader) {
         const enabled = reader.bool();
         const color = reader.read(RGBA);
-        return new SetPlayerOutlineMessage(enabled, color);
+        return new SetOutlineMessage(enabled, color);
     }
 
     Serialize(writer: HazelWriter) {

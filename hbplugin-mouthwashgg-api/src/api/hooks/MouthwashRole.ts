@@ -8,6 +8,10 @@ import { getRoleObjective } from "./RoleObjective";
 const mouthwashRoleKey = Symbol("mouthwash:roleMetadata");
 
 export function MouthwashRole(roleName: string, alignment: RoleAlignment, themeColor: RGBA, emoji: Emoji) {
+    if (alignment === RoleAlignment.All) {
+        throw new Error("Cannot create role with 'All' alignment");
+    }
+
     return function<T extends UntypedRoleCtr>(constructor: T) {
         Reflect.defineMetadata(mouthwashRoleKey, true, constructor);
 

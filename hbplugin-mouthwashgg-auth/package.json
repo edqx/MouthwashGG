@@ -1,5 +1,5 @@
 {
-    "name": "hbplugin-mouthwashgg-api",
+    "name": "hbplugin-mouthwashgg-auth",
     "license": "SSPL-1.0",
     "packageManager": "yarn@3.0.0-rc.13",
     "main": "./dist/index.js",
@@ -16,7 +16,6 @@
     "dependencies": {
         "@skeldjs/events": "^2.13.10",
         "got": "^11.8.2",
-        "hbplugin-mouthwashgg-auth": "link:../hbplugin-mouthwashgg-auth",
         "mouthwash-types": "link:../mouthwash-types",
         "reflect-metadata": "^0.1.13",
         "uuid": "^8.3.2"

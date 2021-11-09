@@ -12,11 +12,12 @@ import {
 
 import { ButtonFixedUpdateEvent } from "../../events";
 import { AssetReference } from "../assets";
-import { Button } from "../buttons";
 import { EmojiService } from "../emojis";
-import { AnyImpostorKillDistance, DefaultRoomOptionName } from "../gameOptions";
+import { AnyKillDistance, DefaultRoomOptionName } from "../gameOptions";
+import { Button } from "../hud";
 
 const killDistanceToRange = {
+    "Really Short": 0.5,
     "Short": 1,
     "Medium": 2,
     "Long": 3
@@ -34,7 +35,7 @@ export class Impostor extends BaseRole {
     constructor(player: PlayerData<Room>) {
         super(player);
 
-        this._killRange = killDistanceToRange[this.api.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillDistance)?.getValue<EnumValue<AnyImpostorKillDistance>>().selectedOption || "Short"];
+        this._killRange = killDistanceToRange[this.api.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillDistance)?.getValue<EnumValue<AnyKillDistance>>().selectedOption || "Short"];
         this._killCooldown = this.api.gameOptions.gameOptions.get(DefaultRoomOptionName.ImpostorKillCooldown)?.getValue<NumberValue>().value || 45;
 
         this._target = undefined;
@@ -56,18 +57,15 @@ export class Impostor extends BaseRole {
             }
         );
 
-        this._killButton.on("mwgg.button.click", ev => {
-            if (!this._killButton || this._killButton.currentTime > 0)
-                return;
-
-            if (!this._target)
+        this._killButton?.on("mwgg.button.click", ev => {
+            if (!this._killButton || this._killButton.currentTime > 0 || !this._target || this.player.info?.isDead)
                 return;
 
             if (this._target.transform) {
                 this.player.transform?.snapTo(this._target.transform.position);
             }
             this._target.control?.murderPlayer(this._target);
-            this._killButton?.setCurrentTime(this._killButton.maxTimer);
+            this._killButton.setCurrentTime(this._killButton.maxTimer);
         });
     }
 

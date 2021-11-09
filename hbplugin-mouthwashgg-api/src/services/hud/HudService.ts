@@ -1,4 +1,13 @@
-import { PlayerData, ReliablePacket, RpcMessage } from "@skeldjs/hindenburg";
+import {
+    ComponentSpawnData,
+    HazelWriter,
+    PlayerData,
+    ReliablePacket,
+    Room,
+    RpcMessage,
+    SpawnMessage,
+    Vector2
+} from "@skeldjs/hindenburg";
 
 import {
     CloseHudMessage,
@@ -11,9 +20,13 @@ import {
     SetHudVisibility,
     SetHudStringMessage,
     Palette,
-    AllowTaskInteractionMessage
+    AllowTaskInteractionMessage,
+    EdgeAlignment,
+    CustomNetworkTransformGeneric,
+    MouthwashSpawnType
 } from "mouthwash-types";
 
+import { Button, ButtonSpawnInfo } from "./Button";
 import { MouthwashApiPlugin } from "../../plugin";
 
 export const __unset = Symbol("__unset");
@@ -26,6 +39,8 @@ export class PlayerHudManager {
     modstampColor: RGBA;
     allowTaskInteraction: boolean;
 
+    buttons: Map<string, Button>;
+
     constructor() {
         this.hudItemVisibility = new Map;
         this.hudStrings = new Map;
@@ -33,6 +48,8 @@ export class PlayerHudManager {
         this.modstampText = "Playing on Mouthwash.gg";
         this.modstampColor = Palette.white;
         this.allowTaskInteraction = true;
+
+        this.buttons = new Map;
     }
 
     getFullHudString(location: HudLocation) {
@@ -89,7 +106,7 @@ export class HudService {
         if (!Array.isArray(sendTo))
             throw new TypeError("Expected array of players for 'sendTo', got " + typeof sendTo);
 
-        const connections = this.plugin.getConnections(sendTo);
+        const connections = this.plugin.room.getConnections(sendTo);
 
         await this.plugin.room.broadcastMessages([], [
             new DisplaySystemAnnouncementMessage(content)
@@ -98,7 +115,7 @@ export class HudService {
 
     async setChatVisible(visible: boolean) {
         if (!this.plugin.room.gameData)
-            throw new Error("No gamedata spawned");
+            return;
 
         for (const [ , player ] of this.plugin.room.players) {
             this.getPlayerHud(player).chatVisible = visible;
@@ -117,13 +134,13 @@ export class HudService {
             throw new TypeError("Expected array of players for 'setFor', got " + typeof setFor);
 
         if (!this.plugin.room.gameData)
-            throw new Error("No gamedata spawned");
+        return;
 
         for (const player of setFor) {
             this.getPlayerHud(player).chatVisible = visible;
         }
         
-        const connections = this.plugin.getConnections(setFor);
+        const connections = this.plugin.room.getConnections(setFor);
 
         await this.plugin.room.broadcastMessages([
             new RpcMessage(
@@ -135,7 +152,7 @@ export class HudService {
 
     async closeHud() {
         if (!this.plugin.room.gameData)
-            throw new Error("No gamedata spawned");
+            return;
             
         await this.plugin.room.broadcastMessages([
             new RpcMessage(
@@ -150,9 +167,9 @@ export class HudService {
             throw new TypeError("Expected array of players for 'closeFor', got " + typeof closeFor);
 
         if (!this.plugin.room.gameData)
-            throw new Error("No gamedata spawned");
+            return;
             
-        const connections = this.plugin.getConnections(closeFor);
+        const connections = this.plugin.room.getConnections(closeFor);
 
         await this.plugin.room.broadcastMessages([
             new RpcMessage(
@@ -183,7 +200,7 @@ export class HudService {
             this.getPlayerHud(player).hudItemVisibility.set(item, visible);
         }
         
-        const connections = this.plugin.getConnections(setFor);
+        const connections = this.plugin.room.getConnections(setFor);
 
         await this.plugin.room.broadcastMessages([], [
             new SetHudVisibility(
@@ -406,5 +423,98 @@ export class HudService {
             promises.push(this.updateHudString(hudLocation, player, hudManager));
         }
         await Promise.all(promises);
+    }
+
+    despawnAllButtons(player: PlayerData<Room>) {
+        const buttons = this.getPlayerHud(player).buttons;
+        for (const [ , button ] of buttons) {
+            button.destroy();
+        }
+    }
+
+    async spawnButton(player: PlayerData<Room>, buttonId: string, spawnInfo: Partial<ButtonSpawnInfo>) {
+        const playerButtons = this.getPlayerHud(player).buttons;
+
+        if (playerButtons.has(buttonId))
+            throw new Error("Player already has button with id '" + buttonId + "'");
+
+        const spawnedObject = this.plugin.room.spawnPrefab(
+            MouthwashSpawnType.Button,
+            -2,
+            0,
+            [
+                {
+                    alignment: spawnInfo.alignment || EdgeAlignment.None,
+                    position: spawnInfo.position || Vector2.null,
+                    z: spawnInfo.z ?? -9,
+                    attachedTo: spawnInfo.attachedTo ?? -1,
+                },
+                {
+                    assetId: spawnInfo.asset?.assetId || 0
+                },
+                {
+                    maxTimer: spawnInfo.maxTimer || 0,
+                    currentTime: spawnInfo.currentTime || 0,
+                    saturated: spawnInfo.saturated || 0,
+                    color: spawnInfo.color || 0,
+                    countingDown: spawnInfo.isCountingDown || false,
+                    keys: spawnInfo.keys || []
+                }
+            ],
+            false,
+            true
+        ) as CustomNetworkTransformGeneric|undefined;
+
+        if (!spawnedObject)
+            throw new Error("Failed to spawn button prefab");
+
+        const idx = this.plugin.room.objectList.indexOf(spawnedObject);
+        if (idx > -1) {
+            this.plugin.room.objectList.splice(idx, 1);
+        }
+        
+        const connection = this.plugin.room.connections.get(player.clientId);
+
+        if (connection) {
+            const cntgWriter = HazelWriter.alloc(10);
+            cntgWriter.write(spawnedObject);
+
+            const gWriter = HazelWriter.alloc(1);
+            gWriter.write(spawnedObject.components[1]);
+
+            const cbWriter = HazelWriter.alloc(14);
+            cbWriter.write(spawnedObject.components[2]);
+    
+            await this.plugin.room.broadcastMessages([
+                new SpawnMessage(
+                    MouthwashSpawnType.Button,
+                    -2,
+                    0,
+                    [ 
+                        new ComponentSpawnData(
+                            spawnedObject.netId,
+                            cntgWriter.buffer
+                        ),
+                        new ComponentSpawnData(
+                            spawnedObject.components[1].netId,
+                            gWriter.buffer
+                        ),
+                        new ComponentSpawnData(
+                            spawnedObject.components[2].netId,
+                            cbWriter.buffer
+                        )
+                    ]
+                )
+            ], undefined, [ connection ]);
+        }
+
+        const button = new Button(this, buttonId, player, spawnedObject);
+        playerButtons.set(buttonId, button);
+
+        spawnedObject.on("component.despawn", () => {
+            playerButtons.delete(buttonId);
+        });
+
+        return button;
     }
 }

@@ -19,9 +19,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg-api%40workspace%3A.":
+"@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg-auth%40workspace%3A.":
   version: 0.0.0-use.local
-  resolution: "@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg-api%40workspace%3A."
+  resolution: "@skeldjs/hindenburg@link:../../Hindenburg::locator=hbplugin-mouthwashgg-auth%40workspace%3A."
   languageName: node
   linkType: soft
 
@@ -221,27 +221,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hbplugin-mouthwashgg-api@workspace:.":
+"hbplugin-mouthwashgg-auth@workspace:.":
   version: 0.0.0-use.local
-  resolution: "hbplugin-mouthwashgg-api@workspace:."
+  resolution: "hbplugin-mouthwashgg-auth@workspace:."
   dependencies:
     "@skeldjs/events": ^2.13.10
     "@skeldjs/hindenburg": "link:../../Hindenburg"
     "@types/got": ^9.6.12
     "@types/uuid": ^8.3.1
     got: ^11.8.2
-    hbplugin-mouthwashgg-auth: "link:../hbplugin-mouthwashgg-auth"
     mouthwash-types: "link:../mouthwash-types"
     reflect-metadata: ^0.1.13
     typescript: ^4.4.2
     uuid: ^8.3.2
   languageName: unknown
-  linkType: soft
-
-"hbplugin-mouthwashgg-auth@link:../hbplugin-mouthwashgg-auth::locator=hbplugin-mouthwashgg-api%40workspace%3A.":
-  version: 0.0.0-use.local
-  resolution: "hbplugin-mouthwashgg-auth@link:../hbplugin-mouthwashgg-auth::locator=hbplugin-mouthwashgg-api%40workspace%3A."
-  languageName: node
   linkType: soft
 
 "http-cache-semantics@npm:^4.0.0":
@@ -269,11 +262,11 @@ __metadata:
   linkType: hard
 
 "keyv@npm:^4.0.0":
-  version: 4.0.4
-  resolution: "keyv@npm:4.0.4"
+  version: 4.0.3
+  resolution: "keyv@npm:4.0.3"
   dependencies:
     json-buffer: 3.0.1
-  checksum: 73f0f45e149be12aab0449a59c9a490195f231ef90024222e544f4c24221fa2b4ec1cd432f92384f0f852e6ae48b7e97f1bf2147c29616b2feddf8ffbc401777
+  checksum: 770134225c5320861748bf65f022e7ce100e465b85b28fe39036ef66f6190bb602aa8a57df365b9c745005d948fc1f0da99306062875a2f52700195e0b4d1033
   languageName: node
   linkType: hard
 
@@ -314,9 +307,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg-api%40workspace%3A.":
+"mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg-auth%40workspace%3A.":
   version: 0.0.0-use.local
-  resolution: "mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg-api%40workspace%3A."
+  resolution: "mouthwash-types@link:../mouthwash-types::locator=hbplugin-mouthwashgg-auth%40workspace%3A."
   languageName: node
   linkType: soft
 
